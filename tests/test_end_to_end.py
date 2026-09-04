@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from typing import Any
 from unittest.mock import patch
 
 from backend.orchestrator import BedrockDecisionClient, BioSignalOrchestrator, Decision, ModelResult
@@ -12,7 +13,7 @@ from backend.schemas import ActionStatus, Hypothesis
 class FakeBedrockClient:
     model_id = "fake-sonnet-5"
 
-    def choose(self, packet: dict[str, object], available_tools: list[str]) -> ModelResult:
+    def choose(self, packet: dict[str, Any], available_tools: list[str]) -> ModelResult:
         priority = [
             "correlate_signals",
             "assess_spread_plausibility",
@@ -21,7 +22,13 @@ class FakeBedrockClient:
             "finish_investigation",
         ]
         selected = next(name for name in priority if name in available_tools)
-        return ModelResult(Decision(selected, {}), input_tokens=120, output_tokens=15)
+        tool_input: dict[str, Any] = {
+            "rationale": f"Select {selected} for the next bounded check."
+        }
+        if selected == "recommend_next_check":
+            candidates = packet["verification_candidates"]
+            tool_input["candidate_id"] = candidates[0]["candidate_id"]
+        return ModelResult(Decision(selected, tool_input), input_tokens=120, output_tokens=15)
 
 
 class FakeBedrockRuntime:
@@ -34,7 +41,12 @@ class FakeBedrockRuntime:
             "output": {
                 "message": {
                     "content": [
-                        {"toolUse": {"name": "correlate_signals", "input": {}}}
+                        {
+                            "toolUse": {
+                                "name": "correlate_signals",
+                                "input": {"rationale": "Check the available cross-domain signals."},
+                            }
+                        }
                     ]
                 }
             },
@@ -46,7 +58,14 @@ class EndToEndTests(unittest.TestCase):
     def test_every_scenario_matches_expected_screening_outcome(self) -> None:
         self.assertEqual(
             set(available_scenarios()),
-            {"contradictory_evidence", "seasonal_outbreak", "zoonotic_spillover"},
+            {
+                "contradictory_evidence",
+                "geographic_mismatch",
+                "human_only_signal",
+                "imported_outbreak_context",
+                "seasonal_outbreak",
+                "zoonotic_spillover",
+            },
         )
         for name in available_scenarios():
             with self.subTest(scenario=name):
@@ -83,6 +102,23 @@ class EndToEndTests(unittest.TestCase):
         self.assertTrue(profile.change_log)
         self.assertTrue(any(item.evidence_id == "EV-REPORT-SIG-E-001" for item in profile.known_findings))
 
+    def test_next_check_adapts_to_the_material_evidence_gap(self) -> None:
+        expected_candidate = {
+            "contradictory_evidence": "corroborate-external-report",
+            "seasonal_outbreak": "repeat-surveillance-review",
+            "zoonotic_spillover": "paired-laboratory-confirmation",
+        }
+        for scenario_name, candidate_id in expected_candidate.items():
+            with self.subTest(scenario=scenario_name):
+                profile = BioSignalOrchestrator(mode="replay").run(load_scenario(scenario_name))
+                recommendation_step = next(
+                    record
+                    for record in profile.tool_trace
+                    if record.tool_name == "recommend_next_check"
+                )
+                self.assertEqual(recommendation_step.tool_input["candidate_id"], candidate_id)
+                self.assertIn("Decision rationale:", recommendation_step.summary)
+
     def test_live_path_tracks_calls_tokens_and_cost(self) -> None:
         orchestrator = BioSignalOrchestrator(
             mode="live",
@@ -111,6 +147,7 @@ class EndToEndTests(unittest.TestCase):
         client.max_output_tokens = 300
         result = client.choose({"case_id": "BIO-TEST"}, ["correlate_signals"])
         self.assertEqual(result.decision.tool_name, "correlate_signals")
+        self.assertTrue(result.decision.tool_input["rationale"])
         self.assertEqual(result.input_tokens, 90)
         self.assertEqual(result.output_tokens, 12)
         self.assertEqual(runtime.request["modelId"], "global.anthropic.claude-sonnet-5")

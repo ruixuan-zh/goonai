@@ -10,11 +10,13 @@ class EvaluationTests(unittest.TestCase):
         report = evaluate_replay_suite()
         summary = report["summary"]
 
-        self.assertEqual(report["scenario_count"], 3)
+        self.assertEqual(report["scenario_count"], 6)
         self.assertEqual(summary["expected_hypothesis_match_rate"], 1.0)
         self.assertEqual(summary["expected_status_match_rate"], 1.0)
         self.assertEqual(summary["task_completion_rate"], 1.0)
         self.assertEqual(summary["tool_call_success_rate"], 1.0)
+        self.assertEqual(summary["tool_rationale_completeness_rate"], 1.0)
+        self.assertEqual(summary["verification_recommendation_rate"], 1.0)
         self.assertEqual(summary["evidence_provenance_completeness_rate"], 1.0)
         self.assertEqual(summary["limit_violation_count"], 0)
         self.assertEqual(summary["automatic_action_count"], 0)

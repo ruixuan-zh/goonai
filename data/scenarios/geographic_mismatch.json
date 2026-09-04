@@ -1,0 +1,41 @@
+{
+  "scenario_id": "geographic_mismatch",
+  "title": "Human and animal anomalies in different locations",
+  "description": "A negative control where unusual human and animal observations do not meet the same-location correlation rule.",
+  "data_notice": "All operational observations and identifiers in this scenario are synthetic. The case tests resistance to a false cross-domain match.",
+  "initial_signals": [
+    {
+      "signal_id": "SIG-A-301",
+      "timestamp": "2026-08-18T02:00:00Z",
+      "domain": "animal",
+      "location_cell": "GRID-N-01",
+      "signal_type": "avian_mortality_reports",
+      "observed_value": 13,
+      "baseline_mean": 3,
+      "baseline_std": 2,
+      "unit": "reports_per_day",
+      "source_id": "SYN-ANIMAL-SURV-04",
+      "source_confidence": 0.86,
+      "provenance": "Synthetic geographical-mismatch control observation.",
+      "synthetic": true
+    },
+    {
+      "signal_id": "SIG-H-301",
+      "timestamp": "2026-08-19T08:00:00Z",
+      "domain": "human",
+      "location_cell": "GRID-S-09",
+      "signal_type": "acute_respiratory_presentations",
+      "observed_value": 20,
+      "baseline_mean": 8,
+      "baseline_std": 3,
+      "unit": "presentations_per_day",
+      "source_id": "SYN-HUMAN-SURV-04",
+      "source_confidence": 0.9,
+      "provenance": "Synthetic geographical-mismatch control observation.",
+      "synthetic": true
+    }
+  ],
+  "new_evidence_signals": [],
+  "expected_leading_hypothesis": "insufficient_evidence",
+  "expected_status": "monitor"
+}

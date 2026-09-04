@@ -1,12 +1,14 @@
 {
   "evaluation_mode": "deterministic_replay",
   "scope_note": "Regression results on hand-authored synthetic scenarios; these are not clinical accuracy, epidemiological validation, or calibrated attack-attribution metrics.",
-  "scenario_count": 3,
+  "scenario_count": 6,
   "summary": {
     "expected_hypothesis_match_rate": 1.0,
     "expected_status_match_rate": 1.0,
     "task_completion_rate": 1.0,
     "tool_call_success_rate": 1.0,
+    "tool_rationale_completeness_rate": 1.0,
+    "verification_recommendation_rate": 1.0,
     "evidence_provenance_completeness_rate": 1.0,
     "limit_violation_count": 0,
     "automatic_action_count": 0
@@ -23,7 +25,50 @@
       "completed_within_limits": true,
       "tool_calls": 4,
       "model_calls": 0,
-      "estimated_cost_usd": 0.0
+      "estimated_cost_usd": 0.0,
+      "recommended_verification": "Seek an independent source for the uncorroborated report before changing the assessment."
+    },
+    {
+      "scenario_id": "geographic_mismatch",
+      "expected_leading_hypothesis": "insufficient_evidence",
+      "actual_leading_hypothesis": "insufficient_evidence",
+      "expected_status": "monitor",
+      "actual_status": "monitor",
+      "hypothesis_match": true,
+      "status_match": true,
+      "completed_within_limits": true,
+      "tool_calls": 3,
+      "model_calls": 0,
+      "estimated_cost_usd": 0.0,
+      "recommended_verification": "Repeat the surveillance review after the next reporting interval and check for a new cross-domain match."
+    },
+    {
+      "scenario_id": "human_only_signal",
+      "expected_leading_hypothesis": "insufficient_evidence",
+      "actual_leading_hypothesis": "insufficient_evidence",
+      "expected_status": "monitor",
+      "actual_status": "monitor",
+      "hypothesis_match": true,
+      "status_match": true,
+      "completed_within_limits": true,
+      "tool_calls": 3,
+      "model_calls": 0,
+      "estimated_cost_usd": 0.0,
+      "recommended_verification": "Repeat the surveillance review after the next reporting interval and check for a new cross-domain match."
+    },
+    {
+      "scenario_id": "imported_outbreak_context",
+      "expected_leading_hypothesis": "insufficient_evidence",
+      "actual_leading_hypothesis": "insufficient_evidence",
+      "expected_status": "monitor",
+      "actual_status": "monitor",
+      "hypothesis_match": true,
+      "status_match": true,
+      "completed_within_limits": true,
+      "tool_calls": 4,
+      "model_calls": 0,
+      "estimated_cost_usd": 0.0,
+      "recommended_verification": "Repeat the surveillance review after the next reporting interval and check for a new cross-domain match."
     },
     {
       "scenario_id": "seasonal_outbreak",
@@ -36,7 +81,8 @@
       "completed_within_limits": true,
       "tool_calls": 3,
       "model_calls": 0,
-      "estimated_cost_usd": 0.0
+      "estimated_cost_usd": 0.0,
+      "recommended_verification": "Repeat the surveillance review after the next reporting interval and check for a new cross-domain match."
     },
     {
       "scenario_id": "zoonotic_spillover",
@@ -49,7 +95,8 @@
       "completed_within_limits": true,
       "tool_calls": 3,
       "model_calls": 0,
-      "estimated_cost_usd": 0.0
+      "estimated_cost_usd": 0.0,
+      "recommended_verification": "Obtain targeted laboratory confirmation from both human and animal samples."
     }
   ]
 }

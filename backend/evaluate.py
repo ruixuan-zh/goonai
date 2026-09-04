@@ -18,10 +18,12 @@ def evaluate_replay_suite() -> dict[str, Any]:
     scenario_results: list[dict[str, Any]] = []
     tool_attempts = 0
     successful_tool_calls = 0
+    tool_calls_with_rationale = 0
     evidence_records = 0
     evidence_with_provenance = 0
     limit_violations = 0
     automatic_actions = 0
+    completed_recommendations = 0
 
     for scenario_name in available_scenarios():
         scenario = load_scenario(scenario_name)
@@ -32,12 +34,16 @@ def evaluate_replay_suite() -> dict[str, Any]:
 
         tool_attempts += len(profile.tool_trace)
         successful_tool_calls += sum(record.success for record in profile.tool_trace)
+        tool_calls_with_rationale += sum(
+            bool(record.tool_input.get("rationale")) for record in profile.tool_trace
+        )
         evidence_records += len(profile.known_findings)
         evidence_with_provenance += sum(bool(item.source_ids) for item in profile.known_findings)
         limit_violations += int(not completed)
         automatic_actions += sum(
             action.status != ActionStatus.PENDING for action in profile.proposed_actions
         )
+        completed_recommendations += int(bool(profile.recommended_verification))
 
         scenario_results.append(
             {
@@ -52,6 +58,7 @@ def evaluate_replay_suite() -> dict[str, Any]:
                 "tool_calls": profile.metrics.tool_calls,
                 "model_calls": profile.metrics.model_calls,
                 "estimated_cost_usd": profile.metrics.estimated_cost_usd,
+                "recommended_verification": profile.recommended_verification[0],
             }
         )
 
@@ -78,6 +85,8 @@ def evaluate_replay_suite() -> dict[str, Any]:
                 sum(item["completed_within_limits"] for item in scenario_results), scenario_count
             ),
             "tool_call_success_rate": rate(successful_tool_calls, tool_attempts),
+            "tool_rationale_completeness_rate": rate(tool_calls_with_rationale, tool_attempts),
+            "verification_recommendation_rate": rate(completed_recommendations, scenario_count),
             "evidence_provenance_completeness_rate": rate(
                 evidence_with_provenance, evidence_records
             ),

@@ -70,13 +70,13 @@ python -m backend.evaluate
 
 Expected baseline:
 
-- 21 tests pass;
-- all three curated scenarios match their expected screening outcome;
-- task-completion and tool-call success rates are 1.0;
+- 22 tests pass;
+- all six curated scenarios match their expected screening outcome;
+- task-completion, tool-call success, tool-rationale completeness and verification-recommendation rates are 1.0;
 - no loop-limit violations;
 - no automatically approved or rejected actions.
 
-These are regression results on a small, hand-authored scenario suite. They are
+These are regression results on a small, hand-authored six-scenario suite. They are
 not clinical accuracy, epidemiological validation or calibrated attribution
 metrics.
 
@@ -318,7 +318,7 @@ tests and a paid smoke test. Keep the replay controller available.
 
 ## Known limitations and recommended next work
 
-1. Expand the curated suite beyond three cases and obtain expert review of
+1. Expand the curated suite beyond six cases and obtain expert review of
    expected investigative steps.
 2. Add parser retries with bounded exponential backoff and representative
    source fixtures.

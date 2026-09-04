@@ -1,0 +1,26 @@
+{
+  "scenario_id": "human_only_signal",
+  "title": "Human anomaly with missing animal corroboration",
+  "description": "A missing-domain case where a human-health anomaly is present but no animal observation is available.",
+  "data_notice": "All operational observations and identifiers in this scenario are synthetic. Missing animal evidence must remain uncertainty, not be imputed.",
+  "initial_signals": [
+    {
+      "signal_id": "SIG-H-401",
+      "timestamp": "2026-08-21T08:00:00Z",
+      "domain": "human",
+      "location_cell": "GRID-E-05",
+      "signal_type": "acute_respiratory_presentations",
+      "observed_value": 19,
+      "baseline_mean": 7,
+      "baseline_std": 3,
+      "unit": "presentations_per_day",
+      "source_id": "SYN-HUMAN-SURV-05",
+      "source_confidence": 0.91,
+      "provenance": "Synthetic missing-domain control observation.",
+      "synthetic": true
+    }
+  ],
+  "new_evidence_signals": [],
+  "expected_leading_hypothesis": "insufficient_evidence",
+  "expected_status": "monitor"
+}

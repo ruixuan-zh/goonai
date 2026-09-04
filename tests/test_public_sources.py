@@ -97,11 +97,21 @@ class PublicSourceTests(unittest.TestCase):
             observations=[
                 observation("CDA-1", "CDA-WEEKLY", Domain.HUMAN, "acute_respiratory", 2600, 2400)
             ],
-            sources=[coverage("CDA-WEEKLY", Domain.HUMAN, SourceStatus.AVAILABLE, 1)],
+            sources=[
+                coverage("CDA-WEEKLY", Domain.HUMAN, SourceStatus.AVAILABLE, 1),
+                coverage("AVS-BIOSURVEILLANCE", Domain.ANIMAL, SourceStatus.CONTEXT_ONLY, 0),
+                coverage("NEA-WASTEWATER", Domain.ENVIRONMENTAL, SourceStatus.CONTEXT_ONLY, 0),
+            ],
         )
         profile = BioSignalOrchestrator(mode="replay").run_public(bundle)
         self.assertEqual(profile.scenario_id, "singapore_public_snapshot")
         self.assertEqual(profile.source_coverage[0].source_id, "CDA-WEEKLY")
+        recommendation_step = next(
+            record for record in profile.tool_trace if record.tool_name == "recommend_next_check"
+        )
+        self.assertEqual(
+            recommendation_step.tool_input["candidate_id"], "obtain-critical-surveillance"
+        )
         self.assertTrue(profile.metrics.completed_within_limits)
         self.assertLessEqual(profile.metrics.tool_calls, 6)
 

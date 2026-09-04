@@ -2,6 +2,8 @@
 
 BIO-SIGNAL implements the target stated in the Agentic AI Biodefence problem statement: when a biological anomaly is detected in Singapore, help government health-security decision-makers correlate fragmented human, animal, environmental, food, mobility and external-intelligence signals; compare natural, accidental and deliberate explanations; identify the most valuable missing evidence; and prepare a timely, evidence-linked risk profile for human action.
 
+The prototype's point-of-view statement is: **a Singapore public-health surveillance duty officer responding to a suspected cross-domain anomaly needs a quick way to assemble traceable evidence and identify the next verification step, because the relevant public indicators are published separately and important animal-health and wastewater measurements may be unavailable publicly.** The repository demonstrates the technical fragmentation through its source manifest and coverage reporting. This statement is not presented as interview-validated or as a measured operational baseline; those claims require evidence from the intended users.
+
 The system is a differential-assessment and investigation prototype, not an attack classifier. It does **not** identify a pathogen, claim causality, attribute intent, or dispatch an operational action. If public evidence cannot distinguish competing explanations, `insufficient_evidence` must remain a valid leading result.
 
 The repository is sized for a hackathon build that can be understood, run and demonstrated in a few days. Claude Sonnet 5 on Amazon Bedrock is the optional decision controller; deterministic Python performs every calculation that affects evidence and support scores. A keyless replay controller makes the submitted demo reproducible.
@@ -24,13 +26,16 @@ natural / accidental / deliberate / insufficient differential
 coverage gaps + recommended verification → human approval gate
 ```
 
-Three scenarios are supplied:
+Six scenarios are supplied:
 
 | Scenario | Purpose | Expected outcome |
 |---|---|---|
 | `zoonotic_spillover` | Animal anomaly precedes a nearby human cluster | Investigate; natural zoonotic is leading |
 | `seasonal_outbreak` | Human rise without an animal anomaly | Monitor; insufficient evidence is leading |
 | `contradictory_evidence` | Correlated signals, reversed temporal order and an uncorroborated report | Verify; medium confidence |
+| `geographic_mismatch` | Human and animal anomalies occur in different locations | Monitor; insufficient evidence is leading |
+| `human_only_signal` | Human anomaly lacks animal-domain corroboration | Monitor; insufficient evidence is leading |
+| `imported_outbreak_context` | Regional outbreak context accompanies a local human signal | Monitor; insufficient evidence is leading |
 
 Support scores are transparent decision aids. They are **not probabilities** and have not been clinically calibrated.
 
@@ -53,7 +58,7 @@ goonai/
 │   └── run_demo.py             # Command-line demonstration
 ├── frontend/
 │   └── app.py                  # Streamlit operator interface
-├── data/scenarios/             # Three synthetic JSON scenarios
+├── data/scenarios/             # Six synthetic JSON scenarios
 ├── data/public_sources.json    # Auditable public-source manifest
 ├── docs/TESTING_AND_HANDOVER.md # Reviewer and maintainer guide
 ├── evals/replay_baseline.json  # Reproducible regression baseline
@@ -167,9 +172,10 @@ For a later pilot, add ingestion adapters outside the orchestration loop, retain
 1. `public_sources.py` permits only fixed HTTPS hosts, retrieves sources concurrently, validates normalised aggregate observations and records partial failures.
 2. The CDA parser compares the current week with CDA's corresponding-week 2021-2025 median. Other feeds are treated as contextual/corroborating observations unless they publish a defensible baseline.
 3. Full source observations are compressed into evidence records. Missing public AVS and wastewater measurements actively increase the `insufficient_evidence` support rather than being imputed.
-4. `analytics.py` performs scenario-level z-score, time, geography and temporal checks. The controller sees only a compact packet and chooses an available approved tool.
-5. `hypothesis_scoring.py` combines visible weights and evidence quality. No model-generated number enters the score.
-6. `reporting.py` caps confidence when critical public domains are missing and requires a person to approve or reject every proposed action.
+4. `analytics.py` performs scenario-level z-score, time, geography and temporal checks. The controller sees only a compact packet and chooses an available approved tool with a concise rationale.
+5. The application derives a bounded list of safe verification candidates from the current evidence. The controller may select among them but cannot invent or dispatch an operational action.
+6. `hypothesis_scoring.py` combines visible weights and evidence quality. No model-generated number enters the score.
+7. `reporting.py` caps confidence when critical public domains are missing and requires a person to approve or reject every proposed action.
 
 The replay policy follows the same available-tool rules as Sonnet. It is not a prerecorded answer: the deterministic tools still execute against the selected scenario.
 
@@ -186,14 +192,14 @@ pytest -q
 python -m backend.evaluate
 ```
 
-The current deterministic baseline is stored in `evals/replay_baseline.json`. It reports expected-hypothesis and expected-status match rates, task completion, tool success, provenance completeness, limit violations and automatic-action count. These are regression metrics on three hand-authored synthetic cases, not clinical accuracy or calibrated attribution performance.
+The current deterministic baseline is stored in `evals/replay_baseline.json`. It reports expected-hypothesis and expected-status match rates, task completion, tool success, controller-rationale completeness, verification selection, provenance completeness, limit violations and automatic-action count. These are regression metrics on six hand-authored synthetic cases, not clinical accuracy or calibrated attribution performance.
 
 The suite covers:
 
 - strict schemas and rejection of non-synthetic records;
 - anomaly and cross-domain correlation behaviour;
 - score normalisation and evidence links;
-- expected outcomes across all three scenarios;
+- expected outcomes across all six scenarios;
 - safe handling of the contradictory case;
 - pending/approved human action state;
 - evidence injection and change recording;

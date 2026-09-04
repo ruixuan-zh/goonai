@@ -128,12 +128,23 @@ if source_mode == "Curated scenario" and scenario.new_evidence_signals:
     if st.button("Inject new synthetic evidence"):
         previous_leader = profile.leading_hypothesis.value
         previous_confidence = profile.confidence.value
+        previous_scores = {
+            assessment.hypothesis: assessment.support_score for assessment in profile.hypotheses
+        }
         try:
             with st.spinner("Re-assessing with the evidence packet…"):
                 updated = BioSignalOrchestrator(mode=mode).run(scenario, include_new_evidence=True)
+            score_changes = []
+            for assessment in updated.hypotheses:
+                change = assessment.support_score - previous_scores.get(assessment.hypothesis, 0)
+                if change:
+                    label = assessment.hypothesis.value.replace("_", " ").title()
+                    score_changes.append(f"{label} {change:+d}")
+            score_summary = ", ".join(score_changes) or "no support-score movement"
             updated.change_log.append(
                 f"Leading hypothesis: {previous_leader} → {updated.leading_hypothesis.value}; "
-                f"confidence: {previous_confidence} → {updated.confidence.value}."
+                f"confidence: {previous_confidence} → {updated.confidence.value}; "
+                f"support shifts: {score_summary}."
             )
             st.session_state.profile = updated
             st.rerun()

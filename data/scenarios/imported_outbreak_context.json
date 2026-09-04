@@ -1,0 +1,43 @@
+{
+  "scenario_id": "imported_outbreak_context",
+  "title": "Local human signal with regional outbreak context",
+  "description": "A case where corroborated regional reporting accompanies a local human anomaly without local animal evidence.",
+  "data_notice": "All operational observations, reports and identifiers in this scenario are synthetic. Regional context is not treated as proof of local transmission.",
+  "initial_signals": [
+    {
+      "signal_id": "SIG-H-501",
+      "timestamp": "2026-08-22T06:00:00Z",
+      "domain": "human",
+      "location_cell": "GRID-C-04",
+      "signal_type": "influenza_like_illness_presentations",
+      "observed_value": 18,
+      "baseline_mean": 8,
+      "baseline_std": 3,
+      "unit": "presentations_per_day",
+      "source_id": "SYN-HUMAN-SURV-06",
+      "source_confidence": 0.9,
+      "provenance": "Synthetic import-context observation.",
+      "synthetic": true
+    },
+    {
+      "signal_id": "SIG-E-501",
+      "timestamp": "2026-08-22T04:00:00Z",
+      "domain": "external",
+      "location_cell": "REGIONAL-CONTEXT",
+      "signal_type": "regional_outbreak_report",
+      "observed_value": 1,
+      "baseline_mean": 0,
+      "baseline_std": 0.25,
+      "unit": "report",
+      "source_id": "SYN-REGIONAL-SURV-01",
+      "source_confidence": 0.88,
+      "provenance": "Synthetic corroborated regional surveillance report.",
+      "synthetic": true,
+      "report_summary": "Two independent regional surveillance sources report an outbreak outside Singapore.",
+      "corroborated": true
+    }
+  ],
+  "new_evidence_signals": [],
+  "expected_leading_hypothesis": "insufficient_evidence",
+  "expected_status": "monitor"
+}
