@@ -1,0 +1,78 @@
+{
+  "target": "Singapore biological anomaly differential assessment",
+  "generated_for": "BIO-SIGNAL hackathon prototype",
+  "sources": [
+    {
+      "source_id": "CDA-WEEKLY",
+      "publisher": "Communicable Diseases Agency",
+      "domain": "human",
+      "access": "Weekly PDF index and bulletin extraction",
+      "url": "https://www.cda.gov.sg/resources/weekly-infectious-diseases-bulletin-2026/",
+      "fields": "Notifiable diseases, polyclinic attendances and respiratory sentinel indicators"
+    },
+    {
+      "source_id": "NEA-DENGUE",
+      "publisher": "National Environment Agency",
+      "domain": "human/vector",
+      "access": "Public HTML",
+      "url": "https://www.nea.gov.sg/dengue-zika/dengue/dengue-cases",
+      "fields": "Latest completed-week cases, active clusters and red-alert clusters"
+    },
+    {
+      "source_id": "NEA-ZIKA",
+      "publisher": "National Environment Agency",
+      "domain": "human/vector",
+      "access": "Public HTML",
+      "url": "https://www.nea.gov.sg/dengue-zika/zika/zika-cases-and-clusters",
+      "fields": "Cumulative cases and cluster situation"
+    },
+    {
+      "source_id": "DATA-GOV-WEATHER",
+      "publisher": "data.gov.sg / National Environment Agency",
+      "domain": "environmental",
+      "access": "Public JSON APIs",
+      "url": "https://api-open.data.gov.sg/v2/real-time/api/rainfall",
+      "fields": "Station rainfall, air temperature and relative humidity"
+    },
+    {
+      "source_id": "SFA-ALERTS",
+      "publisher": "Singapore Food Agency",
+      "domain": "food",
+      "access": "Public structured search endpoint",
+      "url": "https://www.sfa.gov.sg/news-publications/circulars-and-notices/food-alerts-and-recalls",
+      "fields": "Latest food alerts and recalls with publication timestamps and source URLs"
+    },
+    {
+      "source_id": "CHANGI-TRAFFIC",
+      "publisher": "Changi Airport Group",
+      "domain": "mobility",
+      "access": "Public HTML",
+      "url": "https://www.changiairport.com/en/corporate/about-us/traffic-statistics.html",
+      "fields": "Latest monthly passenger movements as import-exposure context"
+    },
+    {
+      "source_id": "WHO-DON",
+      "publisher": "World Health Organization",
+      "domain": "external intelligence",
+      "access": "Official JSON API",
+      "url": "https://www.who.int/emergencies/disease-outbreak-news",
+      "fields": "Latest twenty outbreak reports; locally screened for regional relevance to Singapore"
+    },
+    {
+      "source_id": "AVS-BIOSURVEILLANCE",
+      "publisher": "Animal and Veterinary Service, NParks",
+      "domain": "animal",
+      "access": "Programme description only",
+      "url": "https://avs.nparks.gov.sg/about-us/what-we-do/animal-health/biosurveillance/",
+      "fields": "No current granular public measurements; recorded as a coverage gap"
+    },
+    {
+      "source_id": "NEA-WASTEWATER",
+      "publisher": "National Environment Agency / CDA / PUB",
+      "domain": "environmental",
+      "access": "Programme description only",
+      "url": "https://www.nea.gov.sg/corporate-functions/resources/research/environmental_health_institute/wastewater-surveillance-programme",
+      "fields": "No current site-level viral measurements; recorded as a coverage gap"
+    }
+  ]
+}

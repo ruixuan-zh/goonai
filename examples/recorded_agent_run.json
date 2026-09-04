@@ -1,0 +1,26 @@
+{
+  "scenario_id": "zoonotic_spillover",
+  "controller": "replay-policy-v1",
+  "steps": [
+    {
+      "sequence": 1,
+      "tool": "correlate_signals",
+      "result": "Added one evidence record."
+    },
+    {
+      "sequence": 2,
+      "tool": "assess_spread_plausibility",
+      "result": "Added one evidence record."
+    },
+    {
+      "sequence": 3,
+      "tool": "recommend_next_check",
+      "result": "Selected laboratory confirmation as the next information-gathering step."
+    }
+  ],
+  "limits": {
+    "maximum_model_calls": 4,
+    "maximum_tool_calls": 6,
+    "completed_within_limits": true
+  }
+}

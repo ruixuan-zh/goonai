@@ -1,0 +1,55 @@
+{
+  "evaluation_mode": "deterministic_replay",
+  "scope_note": "Regression results on hand-authored synthetic scenarios; these are not clinical accuracy, epidemiological validation, or calibrated attack-attribution metrics.",
+  "scenario_count": 3,
+  "summary": {
+    "expected_hypothesis_match_rate": 1.0,
+    "expected_status_match_rate": 1.0,
+    "task_completion_rate": 1.0,
+    "tool_call_success_rate": 1.0,
+    "evidence_provenance_completeness_rate": 1.0,
+    "limit_violation_count": 0,
+    "automatic_action_count": 0
+  },
+  "scenarios": [
+    {
+      "scenario_id": "contradictory_evidence",
+      "expected_leading_hypothesis": "natural_zoonotic",
+      "actual_leading_hypothesis": "natural_zoonotic",
+      "expected_status": "verify",
+      "actual_status": "verify",
+      "hypothesis_match": true,
+      "status_match": true,
+      "completed_within_limits": true,
+      "tool_calls": 4,
+      "model_calls": 0,
+      "estimated_cost_usd": 0.0
+    },
+    {
+      "scenario_id": "seasonal_outbreak",
+      "expected_leading_hypothesis": "insufficient_evidence",
+      "actual_leading_hypothesis": "insufficient_evidence",
+      "expected_status": "monitor",
+      "actual_status": "monitor",
+      "hypothesis_match": true,
+      "status_match": true,
+      "completed_within_limits": true,
+      "tool_calls": 3,
+      "model_calls": 0,
+      "estimated_cost_usd": 0.0
+    },
+    {
+      "scenario_id": "zoonotic_spillover",
+      "expected_leading_hypothesis": "natural_zoonotic",
+      "actual_leading_hypothesis": "natural_zoonotic",
+      "expected_status": "investigate",
+      "actual_status": "investigate",
+      "hypothesis_match": true,
+      "status_match": true,
+      "completed_within_limits": true,
+      "tool_calls": 3,
+      "model_calls": 0,
+      "estimated_cost_usd": 0.0
+    }
+  ]
+}

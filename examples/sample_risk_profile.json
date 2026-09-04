@@ -1,0 +1,21 @@
+{
+  "scenario_id": "zoonotic_spillover",
+  "status": "investigate",
+  "confidence": "high",
+  "leading_hypothesis": "natural_zoonotic",
+  "support_scores": {
+    "natural_zoonotic": 71,
+    "insufficient_evidence": 10,
+    "accidental_release": 11,
+    "deliberate_release": 8
+  },
+  "recommended_verification": [
+    "Obtain targeted laboratory confirmation from both human and animal samples."
+  ],
+  "proposed_action": {
+    "action_id": "ACT-LAB-VERIFY",
+    "status": "pending",
+    "human_approval_required": true
+  },
+  "notice": "Illustrative replay output; support scores are not probabilities."
+}

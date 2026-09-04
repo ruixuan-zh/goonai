@@ -1,0 +1,59 @@
+{
+  "scenario_id": "zoonotic_spillover",
+  "title": "Linked avian mortality and human respiratory cluster",
+  "description": "A synthetic vertical slice in which an animal-health anomaly precedes a nearby human-health anomaly.",
+  "data_notice": "All operational observations and identifiers in this scenario are synthetic. Public sources informed only the schema and baseline concepts.",
+  "initial_signals": [
+    {
+      "signal_id": "SIG-A-001",
+      "timestamp": "2026-08-14T02:00:00Z",
+      "domain": "animal",
+      "location_cell": "GRID-NE-04",
+      "signal_type": "avian_mortality_reports",
+      "observed_value": 17,
+      "baseline_mean": 3,
+      "baseline_std": 2,
+      "unit": "reports_per_day",
+      "source_id": "SYN-ANIMAL-SURV-01",
+      "source_confidence": 0.86,
+      "provenance": "Synthetic scenario derived from generic animal-event surveillance fields.",
+      "synthetic": true
+    },
+    {
+      "signal_id": "SIG-H-001",
+      "timestamp": "2026-08-15T08:00:00Z",
+      "domain": "human",
+      "location_cell": "GRID-NE-04",
+      "signal_type": "influenza_like_illness_presentations",
+      "observed_value": 24,
+      "baseline_mean": 8,
+      "baseline_std": 3,
+      "unit": "presentations_per_day",
+      "source_id": "SYN-HUMAN-SURV-01",
+      "source_confidence": 0.92,
+      "provenance": "Synthetic scenario derived from generic syndromic-surveillance fields.",
+      "synthetic": true
+    }
+  ],
+  "new_evidence_signals": [
+    {
+      "signal_id": "SIG-E-001",
+      "timestamp": "2026-08-15T12:00:00Z",
+      "domain": "external",
+      "location_cell": "GRID-NE-04",
+      "signal_type": "cross_jurisdiction_surveillance_report",
+      "observed_value": 1,
+      "baseline_mean": 0,
+      "baseline_std": 1,
+      "unit": "report",
+      "source_id": "SYN-PARTNER-REPORT-01",
+      "source_confidence": 0.84,
+      "provenance": "Synthetic partner report created for the evidence-injection demonstration.",
+      "synthetic": true,
+      "report_summary": "A neighbouring surveillance unit independently observed unusual wild-bird mortality.",
+      "corroborated": true
+    }
+  ],
+  "expected_leading_hypothesis": "natural_zoonotic",
+  "expected_status": "investigate"
+}

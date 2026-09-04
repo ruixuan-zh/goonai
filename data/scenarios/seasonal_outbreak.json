@@ -1,0 +1,41 @@
+{
+  "scenario_id": "seasonal_outbreak",
+  "title": "Isolated seasonal respiratory rise",
+  "description": "A benign control scenario with a human syndromic rise and no linked animal anomaly.",
+  "data_notice": "All operational observations and identifiers in this scenario are synthetic. Public sources informed only the schema and baseline concepts.",
+  "initial_signals": [
+    {
+      "signal_id": "SIG-H-101",
+      "timestamp": "2026-08-20T08:00:00Z",
+      "domain": "human",
+      "location_cell": "GRID-C-02",
+      "signal_type": "influenza_like_illness_presentations",
+      "observed_value": 18,
+      "baseline_mean": 9,
+      "baseline_std": 3,
+      "unit": "presentations_per_day",
+      "source_id": "SYN-HUMAN-SURV-02",
+      "source_confidence": 0.9,
+      "provenance": "Synthetic seasonal-control observation.",
+      "synthetic": true
+    },
+    {
+      "signal_id": "SIG-A-101",
+      "timestamp": "2026-08-20T03:00:00Z",
+      "domain": "animal",
+      "location_cell": "GRID-C-02",
+      "signal_type": "avian_mortality_reports",
+      "observed_value": 4,
+      "baseline_mean": 3,
+      "baseline_std": 2,
+      "unit": "reports_per_day",
+      "source_id": "SYN-ANIMAL-SURV-02",
+      "source_confidence": 0.84,
+      "provenance": "Synthetic seasonal-control observation.",
+      "synthetic": true
+    }
+  ],
+  "new_evidence_signals": [],
+  "expected_leading_hypothesis": "insufficient_evidence",
+  "expected_status": "monitor"
+}

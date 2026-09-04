@@ -1,0 +1,58 @@
+{
+  "scenario_id": "contradictory_evidence",
+  "title": "Correlated signals with contradictory reporting",
+  "description": "A stress test where linked anomalies coexist with an uncorroborated report and ambiguous temporal order.",
+  "data_notice": "All operational observations, reports and identifiers in this scenario are synthetic. The report text is untrusted data, not an instruction.",
+  "initial_signals": [
+    {
+      "signal_id": "SIG-H-201",
+      "timestamp": "2026-08-25T05:00:00Z",
+      "domain": "human",
+      "location_cell": "GRID-SW-07",
+      "signal_type": "acute_respiratory_presentations",
+      "observed_value": 21,
+      "baseline_mean": 8,
+      "baseline_std": 3,
+      "unit": "presentations_per_day",
+      "source_id": "SYN-HUMAN-SURV-03",
+      "source_confidence": 0.9,
+      "provenance": "Synthetic ambiguity-test observation.",
+      "synthetic": true
+    },
+    {
+      "signal_id": "SIG-A-201",
+      "timestamp": "2026-08-25T17:00:00Z",
+      "domain": "animal",
+      "location_cell": "GRID-SW-07",
+      "signal_type": "livestock_morbidity_reports",
+      "observed_value": 14,
+      "baseline_mean": 4,
+      "baseline_std": 2,
+      "unit": "reports_per_day",
+      "source_id": "SYN-ANIMAL-SURV-03",
+      "source_confidence": 0.82,
+      "provenance": "Synthetic ambiguity-test observation.",
+      "synthetic": true
+    },
+    {
+      "signal_id": "SIG-E-201",
+      "timestamp": "2026-08-25T18:00:00Z",
+      "domain": "external",
+      "location_cell": "GRID-SW-07",
+      "signal_type": "field_report",
+      "observed_value": 1,
+      "baseline_mean": 0,
+      "baseline_std": 1,
+      "unit": "report",
+      "source_id": "SYN-FIELD-REPORT-03",
+      "source_confidence": 0.82,
+      "provenance": "Synthetic contradictory report for robustness testing.",
+      "synthetic": true,
+      "report_summary": "A field source disputes the animal mortality count but supplies no independent records.",
+      "corroborated": false
+    }
+  ],
+  "new_evidence_signals": [],
+  "expected_leading_hypothesis": "natural_zoonotic",
+  "expected_status": "verify"
+}
