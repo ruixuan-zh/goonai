@@ -51,7 +51,14 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     if load_dotenv is not None:
         load_dotenv()
-    args = build_parser().parse_args()
+    parser = build_parser()
+    args = parser.parse_args()
+    if args.public_data and args.include_new_evidence:
+        parser.error("--include-new-evidence applies only to curated scenarios")
+    if args.snapshot_output and not args.public_data:
+        parser.error("--snapshot-output requires --public-data")
+    if args.output and args.snapshot_output and args.output.resolve() == args.snapshot_output.resolve():
+        parser.error("Risk profile and snapshot outputs must use different paths")
     orchestrator = BioSignalOrchestrator(mode=args.mode)
     if args.public_data:
         bundle = collect_singapore_public_data()
@@ -80,6 +87,8 @@ def main() -> int:
         f"estimated US${profile.metrics.estimated_cost_usd:.4f}"
     )
     print("Human approval required for all proposed actions.")
+    if profile.metrics.fallback_used:
+        print("Replay fallback was used; this is not a completed live-model assessment.")
 
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

@@ -83,7 +83,7 @@ def correlate_signals(signals: list[Signal], maximum_gap_hours: int = 72) -> lis
     return [
         Evidence(
             evidence_id="EV-CORR-NONE",
-            finding="No signal-level cross-domain anomaly pair met the 72-hour and same-location screening rule.",
+            finding=f"No signal-level cross-domain anomaly pair met the {maximum_gap_hours}-hour and same-location screening rule.",
             source_ids=sorted({signal.source_id for signal in anomalous}),
             quality=0.75,
             hypothesis_effects={
@@ -108,7 +108,7 @@ def assess_spread_plausibility(signals: list[Signal]) -> list[Evidence]:
         for animal in animals
         for human in humans
         if animal.location_cell == human.location_cell
-        and animal.timestamp <= human.timestamp
+        and animal.timestamp < human.timestamp
         and human.timestamp - animal.timestamp <= timedelta(hours=72)
     ]
     if plausible_pairs:

@@ -70,7 +70,7 @@ python -m backend.evaluate
 
 Expected baseline:
 
-- 22 tests pass;
+- all automated tests pass (the audit expanded the original 22-test suite);
 - all six curated scenarios match their expected screening outcome;
 - task-completion, tool-call success, tool-rationale completeness and verification-recommendation rates are 1.0;
 - no loop-limit violations;
@@ -109,7 +109,7 @@ streamlit run frontend/app.py
 Open the displayed local URL. For the first run choose:
 
 - **Input source:** Curated scenario
-- **Scenario:** Zoonotic spillover early warning
+- **Scenario:** Linked avian mortality and human respiratory cluster
 - **Decision mode:** replay
 
 Confirm that the page shows hypothesis support, evidence provenance, the tool
@@ -181,16 +181,17 @@ The remaining controls are:
 
 | Variable | Default | Meaning |
 |---|---:|---|
-| `BIO_SIGNAL_MAX_MODEL_CALLS` | `4` | Maximum paid model decisions in one investigation |
+| `BIO_SIGNAL_MAX_MODEL_CALLS` | `4` | Maximum model attempts, including failed requests, in one investigation |
 | `BIO_SIGNAL_MAX_TOOL_CALLS` | `6` | Maximum local tool executions |
 | `BIO_SIGNAL_MAX_OUTPUT_TOKENS` | `300` | Output-token cap per model decision |
 | `BIO_SIGNAL_SESSION_BUDGET_USD` | `1.00` | Per-investigation estimated-cost guard |
 | `BIO_SIGNAL_FALLBACK_TO_REPLAY` | `true` | Continue safely with replay if Bedrock fails |
 
 The budget variable is not an AWS account-wide spending cap. Configure an AWS
-Budget separately. The application estimates standard global Sonnet 5 usage at
-US$3 per million input tokens and US$15 per million output tokens; confirm
-current pricing before a demonstration.
+Budget separately. The application uses conservative planning assumptions of
+US$3 per million input tokens and US$15 per million output tokens. These are not
+a verified current tariff. Requests are estimated before invocation and usage
+is checked afterwards. Confirm current pricing before a demonstration.
 
 Validate live mode with replay fallback disabled so a credential or model-access
 problem cannot look like a successful model run:
@@ -285,8 +286,8 @@ arrays.
 4. Validate with `python -m backend.evaluate`.
 5. Add a focused test when the scenario covers a new failure mode.
 
-Useful next scenarios are a laboratory-accident proxy, imported outbreak,
-missing-data case and benign environmental anomaly. Avoid creating a supposed
+Useful next scenarios are a laboratory-accident proxy, a missing-data case and
+a benign environmental anomaly; an imported-outbreak case is already included. Avoid creating a supposed
 real-world signature for deliberate release.
 
 ### Add a public source
@@ -379,3 +380,9 @@ tests for new behaviours.
 The repository does not include a licence because choosing one determines how
 others may reuse the project. The repository owner should select and add a
 licence before making reuse claims.
+
+## Audit follow-up
+
+Read [REPOSITORY_AUDIT.md](REPOSITORY_AUDIT.md) before planning a pilot. The
+committed example is a complete `RiskProfile`, including its tool trace; the
+separate handwritten trace example was removed to avoid duplicate, stale outputs.

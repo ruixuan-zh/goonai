@@ -14,12 +14,11 @@ import re
 import ssl
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from statistics import mean
 from typing import Any
 from urllib.parse import quote, urlparse
-from urllib.request import Request, urlopen
-
-from pypdf import PdfReader
+from urllib.request import HTTPRedirectHandler, HTTPSHandler, Request, build_opener
 
 from .schemas import (
     Domain,
@@ -47,7 +46,6 @@ ALLOWED_HOSTS = {
 
 CDA_INDEX = "https://www.cda.gov.sg/resources/weekly-infectious-diseases-bulletin-{year}/"
 NEA_DENGUE = "https://www.nea.gov.sg/dengue-zika/dengue/dengue-cases"
-NEA_CLUSTERS = "https://www.nea.gov.sg/dengue-zika/dengue/dengue-clusters"
 NEA_ZIKA = "https://www.nea.gov.sg/dengue-zika/zika/zika-cases-and-clusters"
 NEA_WASTEWATER = (
     "https://www.nea.gov.sg/corporate-functions/resources/research/"
@@ -73,17 +71,33 @@ class PublicSourceError(RuntimeError):
     pass
 
 
+class AllowListedRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        # Validate before urllib sends a request to the redirect destination.
+        validated = PublicSourceClient._validated_url(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, validated)
+
+
 class PublicSourceClient:
     """Small HTTP client that refuses arbitrary or redirected hosts."""
 
     def __init__(self, timeout_seconds: float = 12.0) -> None:
+        if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
+            raise ValueError("Source timeout must be positive and finite")
         self.timeout_seconds = timeout_seconds
         self._ssl_context = ssl.create_default_context()
+        self.max_response_bytes = 10 * 1024 * 1024
 
     @staticmethod
     def _validated_url(url: str) -> str:
         parsed = urlparse(url)
-        if parsed.scheme != "https" or parsed.hostname not in ALLOWED_HOSTS:
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname not in ALLOWED_HOSTS
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.port not in {None, 443}
+        ):
             raise PublicSourceError(f"Source URL is not allow-listed: {url}")
         return quote(url, safe=":/?=&%")
 
@@ -95,9 +109,13 @@ class PublicSourceClient:
             headers["Content-Type"] = "application/json"
         request = Request(validated, data=data, headers=headers, method="POST" if data else "GET")
         try:
-            with urlopen(request, timeout=self.timeout_seconds, context=self._ssl_context) as response:
+            opener = build_opener(HTTPSHandler(context=self._ssl_context), AllowListedRedirectHandler())
+            with opener.open(request, timeout=self.timeout_seconds) as response:
                 self._validated_url(response.geturl())
-                return response.read()
+                content = response.read(self.max_response_bytes + 1)
+                if len(content) > self.max_response_bytes:
+                    raise PublicSourceError("Public source response exceeded the size limit")
+                return content
         except Exception as exc:
             raise PublicSourceError(f"Public source request failed: {url}") from exc
 
@@ -148,6 +166,8 @@ def _coverage(
 
 
 def fetch_cda_bulletin(client: PublicSourceClient) -> tuple[list[PublicObservation], SourceCoverage]:
+    from pypdf import PdfReader
+
     retrieved_at = _now()
     year = retrieved_at.year
     index_url = CDA_INDEX.format(year=year)
@@ -169,13 +189,17 @@ def fetch_cda_bulletin(client: PublicSourceClient) -> tuple[list[PublicObservati
         first_page,
         flags=re.IGNORECASE,
     )
-    observed_at = retrieved_at
-    if date_match:
-        observed_at = datetime.strptime(" ".join(date_match.groups()), "%d %b %Y").replace(tzinfo=SGT)
+    if not date_match:
+        raise PublicSourceError("CDA bulletin reporting date could not be parsed")
+    observed_at = datetime.strptime(" ".join(date_match.groups()), "%d %b %Y").replace(tzinfo=SGT)
+    baseline_years = re.search(r"Median\+?\s*(\d{4})\s*-\s*(\d{4})", first_page, re.IGNORECASE)
+    baseline_description = "CDA median for the corresponding epidemiological week"
+    if baseline_years:
+        baseline_description += f", {baseline_years.group(1)}-{baseline_years.group(2)}"
 
     observations: list[PublicObservation] = []
     row_pattern = re.compile(
-        r"^([A-Za-z][A-Za-z0-9 /&(),.'#^-]*?)\s+((?:\d+|NA)(?:\s+(?:\d+|NA)){2,5})\s*$"
+        r"^([A-Za-z][A-Za-z0-9 /&(),.'#^-]*?)\s+((?:[\d,]+|NA)(?:\s+(?:[\d,]+|NA)){2,5})\s*$"
     )
     for line in first_page.splitlines():
         match = row_pattern.match(line.strip())
@@ -185,19 +209,19 @@ def fetch_cda_bulletin(client: PublicSourceClient) -> tuple[list[PublicObservati
         if tokens[0] == "NA" or tokens[2] == "NA":
             continue
         name = match.group(1).strip().replace("#", "")
-        current = float(tokens[0])
-        baseline = float(tokens[2])
+        current = float(tokens[0].replace(",", ""))
+        baseline = float(tokens[2].replace(",", ""))
         metric = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
         observations.append(
             PublicObservation(
-                observation_id=f"CDA-EW{week}-{metric}",
+                observation_id=f"CDA-{year}-EW{week}-{metric}",
                 observed_at=observed_at,
                 domain=Domain.HUMAN,
                 metric=metric,
                 value=current,
-                unit="weekly notifications" if current < 1000 else "average daily attendances",
+                unit="average daily attendances" if len(tokens) == 3 else "weekly notifications",
                 baseline_value=baseline,
-                baseline_description="CDA median for the corresponding epidemiological week, 2021-2025",
+                baseline_description=baseline_description,
                 source_id="CDA-WEEKLY",
                 source_url=pdf_url,
                 source_confidence=0.97,
@@ -207,15 +231,15 @@ def fetch_cda_bulletin(client: PublicSourceClient) -> tuple[list[PublicObservati
         )
 
     for metric, pattern in {
-        "influenza_ili_positivity": r"positivity rate for influenza[^.]*?was\s+(\d+)%",
-        "covid_ari_positivity": r"positivity rate for COVID-19[^.]*?was\s+(\d+)%",
+        "influenza_ili_positivity": r"positivity rate for influenza[^.]*?was\s+(\d+(?:\.\d+)?)%",
+        "covid_ari_positivity": r"positivity rate for COVID-19[^.]*?was\s+(\d+(?:\.\d+)?)%",
     }.items():
-        match = re.search(pattern, second_page or "", flags=re.IGNORECASE)
+        match = re.search(pattern, re.sub(r"\s+", " ", second_page or ""), flags=re.IGNORECASE)
         if match:
             value = float(match.group(1))
             observations.append(
                 PublicObservation(
-                    observation_id=f"CDA-EW{week}-{metric}",
+                    observation_id=f"CDA-{year}-EW{week}-{metric}",
                     observed_at=observed_at,
                     domain=Domain.HUMAN,
                     metric=metric,
@@ -234,7 +258,7 @@ def fetch_cda_bulletin(client: PublicSourceClient) -> tuple[list[PublicObservati
         f"Weekly Infectious Diseases Bulletin {year}, epidemiological week {week}",
         pdf_url,
         Domain.HUMAN,
-        SourceStatus.AVAILABLE,
+        SourceStatus.AVAILABLE if observations else SourceStatus.PARTIAL,
         len(observations),
         "Weekly PDF",
         "Notifiable-disease counts, polyclinic attendances and respiratory surveillance.",
@@ -247,10 +271,10 @@ def fetch_nea_dengue(client: PublicSourceClient) -> tuple[list[PublicObservation
     text = _plain_text(client.get_text(NEA_DENGUE))
     observations: list[PublicObservation] = []
     weekly = re.search(
-        r"(\d+) dengue cases were reported in the week ending\s+([^,]+),", text, re.IGNORECASE
+        r"([\d,]+) dengue cases were reported in the week ending\s+([^,]+),", text, re.IGNORECASE
     )
     if weekly:
-        value = float(weekly.group(1))
+        value = float(weekly.group(1).replace(",", ""))
         observations.append(
             PublicObservation(
                 observation_id=f"NEA-DENGUE-{retrieved_at:%Y%m%d}",
@@ -272,14 +296,17 @@ def fetch_nea_dengue(client: PublicSourceClient) -> tuple[list[PublicObservation
         re.IGNORECASE,
     )
     if cluster_match:
-        word_numbers = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6}
+        word_numbers = {"zero": 0, "none": 0, "one": 1, "two": 2, "three": 3, "four": 4,
+                        "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
         active = int(cluster_match.group(1))
         red_text = cluster_match.group(2).lower()
-        red = float(word_numbers.get(red_text, int(red_text) if red_text.isdigit() else 0))
+        red = float(red_text) if red_text.isdigit() else word_numbers.get(red_text)
         for suffix, value, summary in (
             ("active-clusters", float(active), f"NEA reports {active} active dengue clusters."),
-            ("red-clusters", red, f"NEA reports {red:g} red-alert dengue clusters."),
+            ("red-clusters", red, f"NEA reports {red:g} red-alert dengue clusters." if red is not None else ""),
         ):
+            if value is None:
+                continue
             observations.append(
                 PublicObservation(
                     observation_id=f"NEA-DENGUE-{retrieved_at:%Y%m%d}-{suffix}",
@@ -295,7 +322,7 @@ def fetch_nea_dengue(client: PublicSourceClient) -> tuple[list[PublicObservation
                     limitations="A cluster is an operational intervention area, not an independent transmission estimate.",
                 )
             )
-    status = SourceStatus.AVAILABLE if observations else SourceStatus.PARTIAL
+    status = SourceStatus.AVAILABLE if len(observations) == 3 else SourceStatus.PARTIAL
     return observations, _coverage(
         "NEA-DENGUE",
         "National Environment Agency",
@@ -348,43 +375,50 @@ def fetch_nea_zika(client: PublicSourceClient) -> tuple[list[PublicObservation],
 def fetch_environment(client: PublicSourceClient) -> tuple[list[PublicObservation], SourceCoverage]:
     retrieved_at = _now()
     observations: list[PublicObservation] = []
+    failures: list[str] = []
     units = {"rainfall": "mm/5 min", "air_temperature": "°C", "relative_humidity": "%"}
     for metric, url in ENVIRONMENTAL_ENDPOINTS.items():
-        payload = client.get_json(url)
-        readings = payload.get("data", {}).get("readings", [])
-        if not readings:
-            continue
-        latest = readings[0]
-        values = [float(item["value"]) for item in latest.get("data", []) if item.get("value") is not None]
-        if not values:
-            continue
-        observed_at = datetime.fromisoformat(latest["timestamp"])
-        for statistic, value in (("mean", mean(values)), ("minimum", min(values)), ("maximum", max(values))):
-            observations.append(
-                PublicObservation(
-                    observation_id=f"DATA-GOV-{metric}-{statistic}-{observed_at:%Y%m%dT%H%M}",
-                    observed_at=observed_at,
-                    domain=Domain.ENVIRONMENTAL,
-                    metric=f"{metric}_{statistic}",
-                    value=round(value, 3),
-                    unit=units[metric],
-                    source_id="DATA-GOV-WEATHER",
-                    source_url=url,
-                    source_confidence=0.96,
-                    summary=f"Singapore station {statistic} {metric.replace('_', ' ')}: {value:.2f} {units[metric]}.",
-                    limitations="A current station snapshot is contextual and is not, by itself, a disease predictor.",
+        source_observations: list[PublicObservation] = []
+        try:
+            payload = client.get_json(url)
+            readings = payload.get("data", {}).get("readings", [])
+            if not readings:
+                raise PublicSourceError("No station measurements returned")
+            latest = max(readings, key=lambda item: datetime.fromisoformat(item["timestamp"]))
+            values = [float(item["value"]) for item in latest.get("data", []) if item.get("value") is not None]
+            if not values:
+                raise PublicSourceError("No station measurements returned")
+            observed_at = datetime.fromisoformat(latest["timestamp"])
+            for statistic, value in (("mean", mean(values)), ("minimum", min(values)), ("maximum", max(values))):
+                source_observations.append(
+                    PublicObservation(
+                        observation_id=f"DATA-GOV-{metric}-{statistic}-{observed_at:%Y%m%dT%H%M}",
+                        observed_at=observed_at,
+                        domain=Domain.ENVIRONMENTAL,
+                        metric=f"{metric}_{statistic}",
+                        value=round(value, 3),
+                        unit=units[metric],
+                        source_id="DATA-GOV-WEATHER",
+                        source_url=url,
+                        source_confidence=0.96,
+                        summary=f"Singapore station {statistic} {metric.replace('_', ' ')}: {value:.2f} {units[metric]}.",
+                        limitations="A current station snapshot is contextual and is not, by itself, a disease predictor.",
+                    )
                 )
-            )
+            observations.extend(source_observations)
+        except (PublicSourceError, ValueError, KeyError, TypeError) as exc:
+            failures.append(f"{metric}: {type(exc).__name__}")
     return observations, _coverage(
         "DATA-GOV-WEATHER",
         "data.gov.sg / National Environment Agency",
         "Real-time rainfall, temperature and humidity",
         ENVIRONMENTAL_ENDPOINTS["rainfall"],
         Domain.ENVIRONMENTAL,
-        SourceStatus.AVAILABLE if observations else SourceStatus.PARTIAL,
+        SourceStatus.PARTIAL if failures else SourceStatus.AVAILABLE,
         len(observations),
         "Near-real-time JSON API",
-        "Current station summaries; historical lag features require a stored time series.",
+        "Current station summaries; historical lag features require a stored time series."
+        + (" Missing endpoints: " + "; ".join(failures) if failures else ""),
         retrieved_at,
     )
 
@@ -417,7 +451,7 @@ def fetch_sfa_alerts(client: PublicSourceClient) -> tuple[list[PublicObservation
     retrieved_at = _now()
     payload = client.post_json(SFA_ALERTS, _sfa_payload())
     observations: list[PublicObservation] = []
-    for item in payload.get("results", []):
+    for item in payload.get("results", [])[:20]:
         title = item.get("title", {}).get("raw")
         published = item.get("date_of_publication_local", {}).get("raw")
         source_url = item.get("url", {}).get("raw")
@@ -526,7 +560,7 @@ def fetch_who_outbreak_news(client: PublicSourceClient) -> tuple[list[PublicObse
             continue
         overview = _plain_text(item.get("Overview") or "")
         combined = f"{title} {overview}".lower()
-        is_regional = any(term in combined for term in regional_terms)
+        is_regional = any(re.search(rf"\b{re.escape(term)}\b", combined) for term in regional_terms)
         source_url = f"https://www.who.int/emergencies/disease-outbreak-news/item/{url_name}"
         observations.append(
             PublicObservation(
@@ -571,7 +605,8 @@ def fetch_avs_coverage(client: PublicSourceClient) -> tuple[list[PublicObservati
         SourceStatus.CONTEXT_ONLY if confirmed else SourceStatus.PARTIAL,
         0,
         "Programme description and public advisories",
-        "AVS confirms monitoring of birds, wild mammals and food animals, but no granular public time series was found.",
+        ("AVS confirms monitoring of birds, wild mammals and food animals, but no granular public time series was found."
+         if confirmed else "Programme description could not be verified; no granular measurements were collected."),
         retrieved_at,
     )
 
@@ -589,7 +624,8 @@ def fetch_wastewater_coverage(client: PublicSourceClient) -> tuple[list[PublicOb
         SourceStatus.CONTEXT_ONLY if confirmed else SourceStatus.PARTIAL,
         0,
         "Programme description",
-        "The public page confirms national coverage, but does not expose current site-level viral measurements.",
+        ("The public page confirms national coverage, but does not expose current site-level viral measurements."
+         if confirmed else "Programme coverage could not be verified; no site-level viral measurements were collected."),
         retrieved_at,
     )
 
@@ -612,6 +648,11 @@ def collect_singapore_public_data(client: PublicSourceClient | None = None) -> P
     observations: list[PublicObservation] = []
     sources: list[SourceCoverage] = []
     retrieved_at = _now()
+    manifest_path = Path(__file__).resolve().parents[1] / "data" / "public_sources.json"
+    manifest = {
+        source["source_id"]: source
+        for source in json.loads(manifest_path.read_text(encoding="utf-8"))["sources"]
+    }
     with ThreadPoolExecutor(max_workers=6) as executor:
         futures = {executor.submit(collector, client): source_id for source_id, collector in collectors.items()}
         for future in as_completed(futures):
@@ -621,16 +662,17 @@ def collect_singapore_public_data(client: PublicSourceClient | None = None) -> P
                 observations.extend(source_observations)
                 sources.append(coverage)
             except Exception as exc:
+                source = manifest[source_id]
                 sources.append(
                     _coverage(
                         source_id,
-                        source_id,
-                        "Public source",
-                        "",
-                        Domain.EXTERNAL,
+                        source["publisher"],
+                        source["fields"],
+                        source["url"],
+                        Domain(source["domain"].split("/")[0].split()[0]),
                         SourceStatus.UNAVAILABLE,
                         0,
-                        "Unknown",
+                        source["access"],
                         f"Collection failed safely: {type(exc).__name__}",
                         retrieved_at,
                     )
@@ -640,6 +682,13 @@ def collect_singapore_public_data(client: PublicSourceClient | None = None) -> P
         observations=sorted(observations, key=lambda item: (item.domain.value, item.metric)),
         sources=sorted(sources, key=lambda item: item.source_id),
     )
+
+
+def critical_public_source_gaps(sources: list[SourceCoverage]) -> list[str]:
+    """Omitted sources are gaps too, not evidence of complete surveillance."""
+
+    measured = {source.source_id for source in sources if source.observation_count > 0}
+    return sorted({"AVS-BIOSURVEILLANCE", "NEA-WASTEWATER"} - measured)
 
 
 def public_bundle_to_evidence(bundle: PublicDataBundle) -> list[Evidence]:
@@ -668,7 +717,10 @@ def public_bundle_to_evidence(bundle: PublicDataBundle) -> list[Evidence]:
             "CDA weekly screening found these largest deviations from its published weekly median: "
             + "; ".join(item.summary for item in unusual[:5])
             if unusual
-            else "CDA weekly screening found no large count deviation under the prototype rule."
+            else (
+                "CDA weekly screening found no large count deviation under the prototype rule."
+                if comparable else "CDA observations contain no usable count baseline; deviation screening is unavailable."
+            )
         )
         evidence.append(
             Evidence(
@@ -724,13 +776,13 @@ def public_bundle_to_evidence(bundle: PublicDataBundle) -> list[Evidence]:
             )
 
     sfa = by_source.get("SFA-ALERTS", [])
-    recent_sfa = [item for item in sfa if bundle.retrieved_at - item.observed_at <= timedelta(days=90)]
+    recent_sfa = [item for item in sfa if timedelta(0) <= bundle.retrieved_at - item.observed_at <= timedelta(days=90)]
     if sfa:
         evidence.append(
             Evidence(
                 evidence_id="EV-PUBLIC-SFA-ALERTS",
                 finding=(
-                    f"SFA published {len(recent_sfa)} food alert(s) in the preceding 90 days. "
+                    f"Among the latest retrieved notices, {len(recent_sfa)} SFA food alert(s) fall in the preceding 90 days. "
                     + " | ".join(item.summary for item in recent_sfa[:3])
                 ).strip(),
                 source_ids=["SFA-ALERTS"],
@@ -747,7 +799,7 @@ def public_bundle_to_evidence(bundle: PublicDataBundle) -> list[Evidence]:
 
     who = by_source.get("WHO-DON", [])
     regional_who = [item for item in who if item.metric == "regional_outbreak_report"]
-    recent_who = [item for item in regional_who if bundle.retrieved_at - item.observed_at <= timedelta(days=90)]
+    recent_who = [item for item in regional_who if timedelta(0) <= bundle.retrieved_at - item.observed_at <= timedelta(days=90)]
     if who:
         selected = recent_who[:5] or who[:3]
         evidence.append(
@@ -770,21 +822,16 @@ def public_bundle_to_evidence(bundle: PublicDataBundle) -> list[Evidence]:
             )
         )
 
-    critical_gaps = [
-        source
-        for source in bundle.sources
-        if source.source_id in {"AVS-BIOSURVEILLANCE", "NEA-WASTEWATER"}
-        and source.observation_count == 0
-    ]
+    critical_gaps = critical_public_source_gaps(bundle.sources)
     if critical_gaps:
         evidence.append(
             Evidence(
                 evidence_id="EV-PUBLIC-COVERAGE-GAPS",
                 finding=(
-                    "Public-source coverage gap: current granular animal-health and wastewater measurements "
-                    "are not exposed by the verified programme pages."
+                    "Public-source coverage gap: the snapshot lacks current measurements from "
+                    + ", ".join(critical_gaps) + "."
                 ),
-                source_ids=[source.source_id for source in critical_gaps],
+                source_ids=critical_gaps,
                 quality=0.98,
                 hypothesis_effects={
                     Hypothesis.NATURAL_ZOONOTIC: -5.0,

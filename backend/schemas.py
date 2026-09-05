@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class Domain(StrEnum):
@@ -53,10 +53,10 @@ class SourceStatus(StrEnum):
 class Signal(BaseModel):
     """A normalised surveillance observation; scenarios must be synthetic."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, str_min_length=1)
 
     signal_id: str
-    timestamp: datetime
+    timestamp: AwareDatetime
     domain: Domain
     location_cell: str
     signal_type: str
@@ -67,7 +67,7 @@ class Signal(BaseModel):
     source_id: str
     source_confidence: float = Field(ge=0, le=1)
     provenance: str
-    synthetic: bool = True
+    synthetic: bool = Field(strict=True)
     report_summary: str | None = None
     corroborated: bool | None = None
 
@@ -80,7 +80,7 @@ class Signal(BaseModel):
 
 
 class Evidence(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, str_min_length=1)
 
     evidence_id: str
     finding: str
@@ -93,16 +93,16 @@ class Evidence(BaseModel):
 class PublicObservation(BaseModel):
     """A non-sensitive aggregate observation retrieved from an allow-listed public source."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, str_min_length=1)
 
     observation_id: str
-    observed_at: datetime
+    observed_at: AwareDatetime
     domain: Domain
     metric: str
     value: float
     unit: str
     geography_scope: str = "Singapore"
-    baseline_value: float | None = None
+    baseline_value: float | None = Field(default=None, ge=0)
     baseline_description: str | None = None
     source_id: str
     source_url: str
@@ -120,17 +120,37 @@ class SourceCoverage(BaseModel):
     url: str
     domain: Domain
     status: SourceStatus
-    retrieved_at: datetime
+    retrieved_at: AwareDatetime
     observation_count: int = Field(ge=0)
     cadence: str
     note: str
 
 
 class PublicDataBundle(BaseModel):
-    retrieved_at: datetime
+    model_config = ConfigDict(extra="forbid")
+
+    retrieved_at: AwareDatetime
     geography_scope: str = "Singapore"
     observations: list[PublicObservation] = Field(default_factory=list)
     sources: list[SourceCoverage] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_provenance(self) -> PublicDataBundle:
+        source_ids = [source.source_id for source in self.sources]
+        observation_ids = [item.observation_id for item in self.observations]
+        if len(source_ids) != len(set(source_ids)) or len(observation_ids) != len(set(observation_ids)):
+            raise ValueError("Public source and observation identifiers must be unique")
+        counts: dict[str, int] = {}
+        for item in self.observations:
+            if item.source_id not in source_ids:
+                raise ValueError("Every public observation must have source coverage")
+            counts[item.source_id] = counts.get(item.source_id, 0) + 1
+        for source in self.sources:
+            if source.observation_count != counts.get(source.source_id, 0):
+                raise ValueError("Source coverage count must match its observations")
+            if source.status in {SourceStatus.UNAVAILABLE, SourceStatus.CONTEXT_ONLY} and source.observation_count:
+                raise ValueError("Unavailable or context-only sources cannot contain measurements")
+        return self
 
 
 class HypothesisAssessment(BaseModel):
@@ -176,10 +196,17 @@ class Scenario(BaseModel):
     title: str
     description: str
     data_notice: str
-    initial_signals: list[Signal]
+    initial_signals: list[Signal] = Field(min_length=1)
     new_evidence_signals: list[Signal] = Field(default_factory=list)
     expected_leading_hypothesis: Hypothesis
     expected_status: CaseStatus
+
+    @model_validator(mode="after")
+    def require_unique_signals(self) -> Scenario:
+        signal_ids = [signal.signal_id for signal in self.initial_signals + self.new_evidence_signals]
+        if len(signal_ids) != len(set(signal_ids)):
+            raise ValueError("Signal identifiers must be unique across both evidence packets")
+        return self
 
 
 class CaseState(BaseModel):
@@ -187,6 +214,7 @@ class CaseState(BaseModel):
     scenario_id: str
     scenario_title: str
     signals: list[Signal]
+    is_public: bool = False
     evidence: list[Evidence] = Field(default_factory=list)
     executed_tools: list[str] = Field(default_factory=list)
     tool_trace: list[ToolCallRecord] = Field(default_factory=list)

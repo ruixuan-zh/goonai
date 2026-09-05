@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .hypothesis_scoring import estimate_confidence, score_hypotheses
+from .public_sources import critical_public_source_gaps
 from .schemas import (
     ActionStatus,
     CaseState,
@@ -16,7 +17,7 @@ from .schemas import (
 
 
 def estimate_sonnet_cost(input_tokens: int, output_tokens: int) -> float:
-    """Estimate standard global Sonnet 5 cost as published from September 2026."""
+    """Conservative planning estimate, not a current tariff or billing control."""
 
     return round((input_tokens * 3.0 + output_tokens * 15.0) / 1_000_000, 6)
 
@@ -79,13 +80,13 @@ def build_risk_profile(
 ) -> RiskProfile:
     assessments = score_hypotheses(state.evidence)
     confidence = estimate_confidence(assessments, state.evidence)
-    missing_critical_public_domains = any(
-        source.source_id in {"AVS-BIOSURVEILLANCE", "NEA-WASTEWATER"}
-        and source.observation_count == 0
-        for source in state.source_coverage
-    )
+    missing_critical_public_domains = state.is_public and critical_public_source_gaps(state.source_coverage)
     if missing_critical_public_domains and confidence == Confidence.HIGH:
         confidence = Confidence.MEDIUM
+    if state.is_public and not any(
+        item.evidence_id != "EV-PUBLIC-COVERAGE-GAPS" for item in state.evidence
+    ):
+        confidence = Confidence.LOW
     leader = assessments[0].hypothesis
     status = _case_status(state, leader, confidence)
     uncertainty = list(dict.fromkeys(state.open_questions))

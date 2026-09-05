@@ -62,7 +62,7 @@ goonai/
 ├── data/public_sources.json    # Auditable public-source manifest
 ├── docs/TESTING_AND_HANDOVER.md # Reviewer and maintainer guide
 ├── evals/replay_baseline.json  # Reproducible regression baseline
-├── examples/                   # Small example outputs
+├── examples/                   # Validated example risk profile, including its trace
 ├── tests/                      # Schema, analytics, scoring and E2E tests
 └── .github/workflows/tests.yml # Offline continuous integration
 ```
@@ -119,18 +119,18 @@ aws configure --profile bio-signal
 python -m backend.run_demo --public-data --mode live
 ```
 
-The runtime identity only needs permission to invoke the selected Bedrock model. Do not commit access keys. `.env` is ignored by Git, and both `.env` and `.env.example` contain blank credential fields. The normal boto3 credential chain is used. See the [testing and handover guide](docs/TESTING_AND_HANDOVER.md) for API-key, profile and temporary-credential examples.
+The runtime identity only needs permission to invoke the selected Bedrock model. Do not commit access keys. `.env` is ignored by Git, and `.env.example` contains blank credential fields; local `.env` contents are private configuration. The normal boto3 credential chain is used. See the [testing and handover guide](docs/TESTING_AND_HANDOVER.md) for API-key, profile and temporary-credential examples.
 
 Live mode has these default guards:
 
 - no more than four Sonnet decisions per case;
 - no more than six deterministic tool executions;
 - no more than 300 generated tokens per decision;
-- temperature `0.0` and forced selection from an allow-list of tools;
+- provider-default sampling and exactly one locally validated, allow-listed tool per accepted decision;
 - an estimated US$1 per-investigation stop;
 - safe replay fallback if Bedrock is unavailable.
 
-The cost estimator uses the standard global Sonnet 5 price published from September 2026: US$3 per million input tokens and US$15 per million output tokens. At four calls of 3,000 input and 300 output tokens each, the estimate is about **US$0.054 per case**. This is an application estimate, not an AWS billing control: confirm current rates on the [Amazon Bedrock pricing page](https://aws.amazon.com/bedrock/pricing/) and configure an [AWS Budget](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-managing-costs.html) for the account.
+The cost estimator retains conservative planning rates of US$3 per million input tokens and US$15 per million output tokens. At four calls of 3,000 input and 300 output tokens each, the estimate is about **US$0.054 per case**. These are planning assumptions, not a verified current Sonnet 5 tariff. The guard checks a conservative request estimate before each call and reported usage afterwards; provider tokenisation, failed requests without usage and billing can differ. This is not an AWS billing control: confirm current rates on the [Amazon Bedrock pricing page](https://aws.amazon.com/bedrock/pricing/) and configure an [AWS Budget](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-managing-costs.html) for the account.
 
 Sonnet is used because the controller benefits from strong instruction following and tool selection, while using a larger model for deterministic maths would add cost without improving auditability. The controller cannot alter scoring weights or execute arbitrary functions.
 
@@ -159,7 +159,7 @@ No personal, patient-level, classified, proprietary or non-public operational da
 | Sonnet packet | Compact evidence findings, source coverage, support scores, open questions, and permitted tools | Bedrock only in `live` mode |
 | Risk brief | Evidence records, uncertainty, support scores, trace, proposed action and run metrics | Streamlit/JSON output locally |
 
-Raw webpages, PDFs, complete observation arrays, credentials and free-form untrusted reports are **not** sent directly to Sonnet. Deterministic code consumes all observations and compresses them into at most a handful of labelled, provenance-bearing evidence items. The system prompt explicitly treats supplied content as data rather than instructions.
+Raw webpages, PDFs, complete observation arrays and credentials are **not** sent directly to Sonnet. Short public notice titles and supplied synthetic external-report summaries can appear in evidence findings sent to the controller. Deterministic code consumes all observations and compresses them into at most a handful of labelled, provenance-bearing evidence items. The system prompt explicitly treats supplied content as data rather than instructions.
 
 The Sonnet model is **not trained or fine-tuned** on these feeds. Public observations are retrieved at assessment time and used as evidence for tool selection and explanation. Training an attack-attribution model on these sparse aggregates would be unsupported: no appropriate labelled Singapore deliberate-event dataset exists. Repeated public snapshots could later form a time series for validated statistical forecasting, but not for autonomous attribution.
 
@@ -169,19 +169,21 @@ For a later pilot, add ingestion adapters outside the orchestration loop, retain
 
 ## How orchestration works
 
-1. `public_sources.py` permits only fixed HTTPS hosts, retrieves sources concurrently, validates normalised aggregate observations and records partial failures.
+1. `public_sources.py` checks fixed HTTPS hosts before every request and redirect, limits response sizes, retrieves sources concurrently, validates normalised aggregate observations and records partial failures.
 2. The CDA parser compares the current week with CDA's corresponding-week 2021-2025 median. Other feeds are treated as contextual/corroborating observations unless they publish a defensible baseline.
 3. Full source observations are compressed into evidence records. Missing public AVS and wastewater measurements actively increase the `insufficient_evidence` support rather than being imputed.
-4. `analytics.py` performs scenario-level z-score, time, geography and temporal checks. The controller sees only a compact packet and chooses an available approved tool with a concise rationale.
+4. For synthetic scenarios, `analytics.py` performs z-score, time, geography and temporal checks. Public aggregates lack comparable signal-level locations and times, so public mode proceeds from its compact source evidence directly to verification selection. The controller sees only a compact packet and chooses an available approved tool with a concise rationale.
 5. The application derives a bounded list of safe verification candidates from the current evidence. The controller may select among them but cannot invent or dispatch an operational action.
 6. `hypothesis_scoring.py` combines visible weights and evidence quality. No model-generated number enters the score.
 7. `reporting.py` caps confidence when critical public domains are missing and requires a person to approve or reject every proposed action.
+
+Sonnet 5 rejects non-default sampling settings, so the request omits `temperature`; automatic tool selection avoids forcing a tool while thinking is enabled. Responses without exactly one valid choice trigger the configured fallback. See the [Sonnet 5 migration notes](https://platform.claude.com/docs/en/models/sonnet-5/whats-new-sonnet-5) and [Bedrock thinking constraints](https://docs.aws.amazon.com/bedrock/latest/userguide/claude-messages-extended-thinking.html). The 300-token default includes any thinking output and may need adjustment after a live smoke test.
 
 The replay policy follows the same available-tool rules as Sonnet. It is not a prerecorded answer: the deterministic tools still execute against the selected scenario.
 
 ## Tests and evaluation
 
-The test files use standard-library `unittest`, so the offline core can be verified before optional packages are installed. Pytest will also discover them.
+The suite uses standard-library `unittest`, with Pydantic required by the core. Install `requirements.txt` to run the complete suite, including PDF parser and Streamlit checks. Pytest also discovers the tests. The synthetic replay runtime does not import the optional PDF reader, Streamlit or boto3.
 
 ```powershell
 python -m unittest discover -s tests -v
@@ -225,3 +227,7 @@ Useful demonstration metrics are already included in each JSON risk profile: mod
 - The prototype does not identify pathogens, infer intent from absence of evidence, or automate notifications.
 - AWS availability, privacy classification, retention, encryption, audit logging and cross-border transfer require separate production review.
 - Evidence suggesting deliberate release is never treated as attribution; the prototype can only recommend further human-led verification.
+
+## Repository audit
+
+See [the repository audit and next-step assessment](docs/REPOSITORY_AUDIT.md) for verified fixes, checks performed, remaining limitations and how this implementation supports the biodefence decision-support goal.

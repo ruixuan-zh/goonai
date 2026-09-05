@@ -21,6 +21,7 @@ def make_signal(signal_id: str, domain: Domain, timestamp: datetime, location: s
         source_id=f"SYN-{signal_id}",
         source_confidence=0.8,
         provenance="Synthetic unit-test fixture.",
+        synthetic=True,
     )
 
 

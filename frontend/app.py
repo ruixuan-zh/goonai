@@ -28,11 +28,11 @@ st.set_page_config(page_title="BIO-SIGNAL", page_icon="◉", layout="wide")
 st.markdown(
     """
     <style>
-      .stApp { background: #f4f1e9; color: #22231f; }
-      [data-testid="stHeader"] { background: #f4f1e9; }
-      h1, h2, h3 { color: #1f2923; letter-spacing: -0.02em; }
+      h1, h2, h3 { letter-spacing: -0.02em; }
+      .stApp h2 { font-size: 1.75rem; }
       .block-container { max-width: 1160px; padding-top: 2.2rem; }
       div[data-testid="stMetric"] { border-top: 2px solid #53685a; padding-top: .7rem; }
+      .stApp [data-testid="stMetricValue"] p { white-space: normal; overflow-wrap: anywhere; }
       .stButton > button { border-radius: 3px; border: 1px solid #445548; }
       .stAlert { border-radius: 3px; }
     </style>
@@ -77,21 +77,25 @@ else:
     st.info(scenario.data_notice, icon="ℹ️")
 
 if start:
+    # Commit the matching profile and snapshot together only after a successful run.
     try:
         with st.spinner("Collecting sources and running the bounded investigation…"):
             orchestrator = BioSignalOrchestrator(mode=mode)
             if source_mode == "Singapore public data":
                 bundle = collect_singapore_public_data()
-                st.session_state.public_bundle = bundle
-                st.session_state.profile = orchestrator.run_public(bundle)
+                profile = orchestrator.run_public(bundle)
             else:
-                st.session_state.profile = orchestrator.run(scenario)
-                st.session_state.public_bundle = None
+                profile = orchestrator.run(scenario)
+                bundle = None
+            st.session_state.profile = profile
+            st.session_state.public_bundle = bundle
+            st.session_state.evidence_injected = False
             st.session_state.profile_source = source_mode
             st.session_state.profile_scenario = selected if source_mode == "Curated scenario" else None
             st.session_state.profile_mode = mode
     except Exception as exc:
         st.error(f"Investigation failed safely: {exc}")
+        st.stop()
 
 profile = st.session_state.get("profile")
 if (
@@ -103,7 +107,7 @@ if (
     )
     or st.session_state.get("profile_mode") != mode
 ):
-    st.subheader("Ready to investigate")
+    st.header("Ready to investigate")
     if source_mode == "Singapore public data":
         st.write(
             "Collect the latest CDA, NEA, data.gov.sg, SFA, AVS, wastewater-programme and "
@@ -123,9 +127,12 @@ status_col.metric("Case status", profile.status.value.upper())
 hypothesis_col.metric("Leading hypothesis", profile.leading_hypothesis.value.replace("_", " ").title())
 confidence_col.metric("Confidence", profile.confidence.value.upper())
 cost_col.metric("Estimated model cost", f"US${profile.metrics.estimated_cost_usd:.4f}")
+st.caption(f"Assessment generated: {profile.generated_at:%Y-%m-%d %H:%M %Z}")
+if profile.metrics.fallback_used:
+    st.warning("The live controller was unavailable or reached its call limit. Replay completed this assessment.")
 
 if source_mode == "Curated scenario" and scenario.new_evidence_signals:
-    if st.button("Inject new synthetic evidence"):
+    if st.button("Inject new synthetic evidence", disabled=st.session_state.get("evidence_injected", False)):
         previous_leader = profile.leading_hypothesis.value
         previous_confidence = profile.confidence.value
         previous_scores = {
@@ -147,12 +154,13 @@ if source_mode == "Curated scenario" and scenario.new_evidence_signals:
                 f"support shifts: {score_summary}."
             )
             st.session_state.profile = updated
+            st.session_state.evidence_injected = True
             st.rerun()
         except Exception as exc:
             st.error(f"Evidence injection failed safely: {exc}")
 
 if profile.source_coverage:
-    st.subheader("Public-source coverage")
+    st.header("Public-source coverage")
     st.caption("Unavailable measurements remain visible as evidence gaps; they are never imputed by the model.")
     coverage_header = (
         "| Domain | Publisher / source | Status | Observations | Cadence |\n"
@@ -164,6 +172,10 @@ if profile.source_coverage:
         for source in profile.source_coverage
     ]
     st.markdown("\n".join([coverage_header, *coverage_lines]))
+    with st.expander("Source retrieval details and limitations"):
+        for source in profile.source_coverage:
+            st.write(f"{source.source_id} — {source.status.value}: {source.note}")
+            st.caption(f"Retrieved: {source.retrieved_at:%Y-%m-%d %H:%M %Z}")
 
     public_bundle = st.session_state.get("public_bundle")
     if public_bundle is not None:
@@ -176,14 +188,13 @@ if profile.source_coverage:
 
 left, right = st.columns([3, 2], gap="large")
 with left:
-    st.subheader("Hypothesis support")
+    st.header("Hypothesis support")
     st.caption("Relative evidence support, not scientific probability")
     for assessment in profile.hypotheses:
         label = assessment.hypothesis.value.replace("_", " ").title()
-        st.write(f"{label} — {assessment.support_score}/100")
-        st.progress(assessment.support_score)
+        st.progress(assessment.support_score, text=f"{label} — {assessment.support_score}/100")
 
-    st.subheader("Known findings")
+    st.header("Known findings")
     for evidence in profile.known_findings:
         with st.expander(f"{evidence.evidence_id} · quality {evidence.quality:.0%}"):
             st.write(evidence.finding)
@@ -191,15 +202,15 @@ with left:
             st.caption("Sources: " + (", ".join(evidence.source_ids) or "none supplied"))
 
 with right:
-    st.subheader("Uncertainty")
+    st.header("Uncertainty")
     for question in profile.uncertainty:
         st.write(f"• {question}")
 
-    st.subheader("Recommended verification")
+    st.header("Recommended verification")
     for check in profile.recommended_verification:
         st.write(f"• {check}")
 
-    st.subheader("Human approval gate")
+    st.header("Human approval gate")
     for action in profile.proposed_actions:
         st.write(action.title)
         st.caption(f"Owner: {action.owner} · Consequence: {action.consequence}")
@@ -215,7 +226,7 @@ with right:
             st.rerun()
         st.caption(f"Decision: {action.status.value}")
 
-st.subheader("Agent trace")
+st.header("Agent trace")
 # Rendered as Markdown rather than st.dataframe/st.table so the demo has no
 # dependency on pyarrow, whose native library is fragile on some platforms.
 trace_header = (
@@ -230,7 +241,7 @@ trace_lines = [
 st.markdown("\n".join([trace_header, *trace_lines]))
 
 if profile.change_log:
-    st.subheader("What changed")
+    st.header("What changed")
     for change in profile.change_log:
         st.write(f"• {change}")
 

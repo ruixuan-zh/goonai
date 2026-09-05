@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import time
 from dataclasses import dataclass
@@ -11,9 +12,9 @@ from uuid import uuid4
 
 from .analytics import ANALYTICAL_TOOLS, anomaly_evidence
 from .hypothesis_scoring import score_hypotheses
-from .public_sources import public_bundle_to_evidence
+from .public_sources import critical_public_source_gaps, public_bundle_to_evidence
 from .reporting import build_risk_profile, estimate_sonnet_cost
-from .schemas import CaseState, Domain, Evidence, PublicDataBundle, RiskProfile, Scenario
+from .schemas import CaseState, Domain, PublicDataBundle, RiskProfile, Scenario
 
 
 TOOL_DESCRIPTIONS = {
@@ -39,6 +40,13 @@ class OrchestrationError(RuntimeError):
 
 class BudgetExceededError(OrchestrationError):
     pass
+
+
+class InvalidDecisionError(OrchestrationError):
+    def __init__(self, message: str, input_tokens: int = 0, output_tokens: int = 0) -> None:
+        super().__init__(message)
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
 
 
 @dataclass(frozen=True)
@@ -100,7 +108,12 @@ class BedrockDecisionClient:
         session_kwargs: dict[str, str] = {"region_name": region}
         if profile_name:
             session_kwargs["profile_name"] = profile_name
-        self._client = boto3.Session(**session_kwargs).client("bedrock-runtime")
+        from botocore.config import Config
+
+        self._client = boto3.Session(**session_kwargs).client(
+            "bedrock-runtime",
+            config=Config(connect_timeout=10, read_timeout=45, retries={"total_max_attempts": 1}),
+        )
         self.model_id = model_id
         self.max_output_tokens = max_output_tokens
 
@@ -161,26 +174,29 @@ class BedrockDecisionClient:
                     "content": [{"text": json.dumps(packet, separators=(",", ":"))}],
                 }
             ],
-            inferenceConfig={"maxTokens": self.max_output_tokens, "temperature": 0.0},
-            toolConfig={"tools": tools, "toolChoice": {"any": {}}},
+            inferenceConfig={"maxTokens": self.max_output_tokens},
+            toolConfig={"tools": tools, "toolChoice": {"auto": {}}},
         )
         content = response.get("output", {}).get("message", {}).get("content", [])
-        tool_use = next((block["toolUse"] for block in content if "toolUse" in block), None)
-        if not tool_use or tool_use.get("name") not in available_tools:
-            raise OrchestrationError("Bedrock returned no valid tool choice")
+        usage = response.get("usage", {})
+        input_tokens = int(usage.get("inputTokens", 0))
+        output_tokens = int(usage.get("outputTokens", 0))
+        tool_uses = [block["toolUse"] for block in content if "toolUse" in block]
+        if len(tool_uses) != 1 or tool_uses[0].get("name") not in available_tools:
+            raise InvalidDecisionError("Bedrock must return exactly one available tool", input_tokens, output_tokens)
+        tool_use = tool_uses[0]
         tool_input = tool_use.get("input", {})
-        if not isinstance(tool_input, dict) or not str(tool_input.get("rationale", "")).strip():
-            raise OrchestrationError("Bedrock returned a tool choice without a rationale")
+        if not isinstance(tool_input, dict):
+            raise InvalidDecisionError("Bedrock returned invalid tool input", input_tokens, output_tokens)
         if (
             tool_use["name"] == "recommend_next_check"
             and tool_input.get("candidate_id") not in candidate_ids
         ):
-            raise OrchestrationError("Bedrock returned an unavailable verification candidate")
-        usage = response.get("usage", {})
+            raise InvalidDecisionError("Bedrock returned an unavailable verification candidate", input_tokens, output_tokens)
         return ModelResult(
             decision=Decision(tool_use["name"], tool_input),
-            input_tokens=int(usage.get("inputTokens", 0)),
-            output_tokens=int(usage.get("outputTokens", 0)),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
         )
 
 
@@ -221,6 +237,12 @@ class BioSignalOrchestrator:
             if session_budget_usd is None
             else session_budget_usd
         )
+        for name in ("max_model_calls", "max_tool_calls", "max_output_tokens"):
+            value = getattr(self, name)
+            if type(value) is not int or value <= 0:
+                raise ValueError(f"{name} must be a positive integer")
+        if not math.isfinite(self.session_budget_usd) or self.session_budget_usd <= 0:
+            raise ValueError("session_budget_usd must be positive and finite")
         if fallback_to_replay is None:
             fallback_to_replay = os.getenv("BIO_SIGNAL_FALLBACK_TO_REPLAY", "true").lower() == "true"
         self.fallback_to_replay = fallback_to_replay
@@ -284,6 +306,8 @@ class BioSignalOrchestrator:
             scenario_id="singapore_public_snapshot",
             scenario_title="Singapore public biological-risk snapshot",
             signals=[],
+            is_public=True,
+            fallback_used=self._initial_fallback,
             evidence=public_bundle_to_evidence(bundle),
             source_coverage=bundle.sources,
             open_questions=[
@@ -306,21 +330,27 @@ class BioSignalOrchestrator:
 
     def _available_tools(self, state: CaseState) -> list[str]:
         available: list[str] = []
-        for required in ("correlate_signals", "assess_spread_plausibility"):
+        for required in self._required_analytical_tools(state):
             if required not in state.executed_tools:
                 available.append(required)
-        has_external = any(signal.domain == Domain.EXTERNAL for signal in state.signals)
-        if has_external and "verify_external_report" not in state.executed_tools:
-            available.append("verify_external_report")
         required_complete = all(
             name in state.executed_tools
-            for name in ("correlate_signals", "assess_spread_plausibility")
-        ) and (not has_external or "verify_external_report" in state.executed_tools)
+            for name in self._required_analytical_tools(state)
+        )
         if required_complete and "recommend_next_check" not in state.executed_tools:
             available.append("recommend_next_check")
         if required_complete and "recommend_next_check" in state.executed_tools:
             available.append("finish_investigation")
         return available
+
+    @staticmethod
+    def _required_analytical_tools(state: CaseState) -> list[str]:
+        if state.is_public:
+            return []
+        required = ["correlate_signals", "assess_spread_plausibility"]
+        if any(signal.domain == Domain.EXTERNAL for signal in state.signals):
+            required.append("verify_external_report")
+        return required
 
     def _verification_candidates(self, state: CaseState) -> list[dict[str, str]]:
         """Return safe, deterministic choices; the controller may select but not invent one."""
@@ -339,12 +369,7 @@ class BioSignalOrchestrator:
                 }
             )
 
-        critical_public_gaps = [
-            source
-            for source in state.source_coverage
-            if source.source_id in {"AVS-BIOSURVEILLANCE", "NEA-WASTEWATER"}
-            and source.observation_count == 0
-        ]
+        critical_public_gaps = critical_public_source_gaps(state.source_coverage) if state.is_public else []
         if critical_public_gaps:
             candidates.append(
                 {
@@ -389,6 +414,7 @@ class BioSignalOrchestrator:
             "evidence": [
                 {
                     "evidence_id": item.evidence_id,
+                    "source_ids": item.source_ids,
                     "finding": item.finding,
                     "quality": item.quality,
                     "limitations": item.limitations,
@@ -415,26 +441,66 @@ class BioSignalOrchestrator:
         }
 
     def _choose(self, state: CaseState, available: list[str]) -> ModelResult:
-        if self.mode == "live" and state.model_calls >= self.max_model_calls:
-            return ModelResult(Decision("finish_investigation", {}), 0, 0)
+        using_bedrock = self.mode == "live" and self._decision_client is not self._replay_client
+        if using_bedrock and state.model_calls >= self.max_model_calls:
+            if available == ["finish_investigation"]:
+                return self._replay_client.choose(self._packet(state), available)
+            if not self.fallback_to_replay:
+                raise OrchestrationError("Model-call limit reached before required checks completed")
+            self._use_replay(state)
+            using_bedrock = False
+        packet = self._packet(state)
+        if using_bedrock:
+            # Conservative planning estimate; provider tokenisation and billing can differ.
+            estimated_input = len(json.dumps(packet).encode("utf-8")) + 4096
+            if estimate_sonnet_cost(
+                state.input_tokens + estimated_input,
+                state.output_tokens + self.max_output_tokens,
+            ) > self.session_budget_usd:
+                raise BudgetExceededError("Insufficient estimated budget for another Bedrock decision")
+            state.model_calls += 1
         try:
-            result = self._decision_client.choose(self._packet(state), available)
-            using_bedrock = self.mode == "live" and self._decision_client is not self._replay_client
+            result = self._decision_client.choose(packet, available)
             if using_bedrock:
-                state.model_calls += 1
                 state.input_tokens += result.input_tokens
                 state.output_tokens += result.output_tokens
                 if estimate_sonnet_cost(state.input_tokens, state.output_tokens) > self.session_budget_usd:
                     raise BudgetExceededError("Configured Bedrock session budget was exceeded")
+            decision = result.decision
+            if decision.tool_name not in available or not isinstance(decision.tool_input, dict):
+                raise OrchestrationError("The controller selected an unavailable tool")
+            rationale = decision.tool_input.get("rationale")
+            allowed_keys = {"rationale"}
+            if decision.tool_name == "recommend_next_check":
+                allowed_keys.add("candidate_id")
+                if decision.tool_input.get("candidate_id") not in {
+                    candidate["candidate_id"] for candidate in packet["verification_candidates"]
+                }:
+                    raise OrchestrationError("The controller selected an unavailable verification candidate")
+            if (
+                not isinstance(rationale, str) or not rationale.strip() or len(rationale) > 240
+                or set(decision.tool_input) - allowed_keys
+            ):
+                raise OrchestrationError("The controller returned invalid decision arguments")
             return result
         except BudgetExceededError:
             raise
         except Exception as exc:
+            if using_bedrock and isinstance(exc, InvalidDecisionError):
+                state.input_tokens += exc.input_tokens
+                state.output_tokens += exc.output_tokens
+                if estimate_sonnet_cost(state.input_tokens, state.output_tokens) > self.session_budget_usd:
+                    raise BudgetExceededError("Configured Bedrock session budget was exceeded") from exc
             if self.mode != "live" or not self.fallback_to_replay:
                 raise OrchestrationError("The decision model failed") from exc
-            state.fallback_used = True
-            self._decision_client = self._replay_client
-            return self._replay_client.choose(self._packet(state), available)
+            state.change_log.append(f"Decision controller fell back to replay: {type(exc).__name__}.")
+            self._use_replay(state)
+            return self._replay_client.choose(packet, available)
+
+    def _use_replay(self, state: CaseState) -> None:
+        state.fallback_used = True
+        self._initial_fallback = True
+        self._decision_client = self._replay_client
 
     def _investigate(self, state: CaseState) -> None:
         while len(state.tool_trace) < self.max_tool_calls:
@@ -468,7 +534,7 @@ class BioSignalOrchestrator:
                     "model_id": self._decision_client.model_id if self.mode == "live" else "replay-policy-v1",
                 }
             )
-        required = {"correlate_signals", "assess_spread_plausibility", "recommend_next_check"}
+        required = {*self._required_analytical_tools(state), "recommend_next_check"}
         if not required.issubset(state.executed_tools):
             raise OrchestrationError("Investigation stopped before required checks completed")
 

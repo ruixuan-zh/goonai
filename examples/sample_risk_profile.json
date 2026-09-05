@@ -1,21 +1,186 @@
 {
+  "case_id": "BIO-ZOONOTIC_SPILLOVER-5837D3",
   "scenario_id": "zoonotic_spillover",
+  "scenario_title": "Linked avian mortality and human respiratory cluster",
+  "generated_at": "2026-09-05T15:32:13.199428Z",
   "status": "investigate",
   "confidence": "high",
   "leading_hypothesis": "natural_zoonotic",
-  "support_scores": {
-    "natural_zoonotic": 71,
-    "insufficient_evidence": 10,
-    "accidental_release": 11,
-    "deliberate_release": 8
-  },
+  "hypotheses": [
+    {
+      "hypothesis": "natural_zoonotic",
+      "support_score": 66,
+      "evidence_for": [
+        "EV-ANOM-SIG-A-001",
+        "EV-ANOM-SIG-H-001",
+        "EV-CORR-SIG-A-001-SIG-H-001",
+        "EV-SPREAD-SIG-A-001-SIG-H-001"
+      ],
+      "evidence_against": []
+    },
+    {
+      "hypothesis": "accidental_release",
+      "support_score": 16,
+      "evidence_for": [
+        "EV-ANOM-SIG-A-001",
+        "EV-ANOM-SIG-H-001",
+        "EV-CORR-SIG-A-001-SIG-H-001"
+      ],
+      "evidence_against": [
+        "EV-SPREAD-SIG-A-001-SIG-H-001"
+      ]
+    },
+    {
+      "hypothesis": "deliberate_release",
+      "support_score": 9,
+      "evidence_for": [
+        "EV-ANOM-SIG-A-001",
+        "EV-ANOM-SIG-H-001",
+        "EV-CORR-SIG-A-001-SIG-H-001"
+      ],
+      "evidence_against": [
+        "EV-SPREAD-SIG-A-001-SIG-H-001"
+      ]
+    },
+    {
+      "hypothesis": "insufficient_evidence",
+      "support_score": 9,
+      "evidence_for": [],
+      "evidence_against": [
+        "EV-ANOM-SIG-A-001",
+        "EV-ANOM-SIG-H-001",
+        "EV-CORR-SIG-A-001-SIG-H-001",
+        "EV-SPREAD-SIG-A-001-SIG-H-001"
+      ]
+    }
+  ],
+  "known_findings": [
+    {
+      "evidence_id": "EV-ANOM-SIG-A-001",
+      "finding": "avian_mortality_reports in GRID-NE-04 is 7.0 standard deviations above its synthetic baseline.",
+      "source_ids": [
+        "SYN-ANIMAL-SURV-01"
+      ],
+      "quality": 0.86,
+      "hypothesis_effects": {
+        "natural_zoonotic": 9.0,
+        "accidental_release": 2.0,
+        "deliberate_release": 1.0,
+        "insufficient_evidence": -2.0
+      },
+      "limitations": "A baseline anomaly is a screening signal, not proof of cause or attribution."
+    },
+    {
+      "evidence_id": "EV-ANOM-SIG-H-001",
+      "finding": "influenza_like_illness_presentations in GRID-NE-04 is 5.3 standard deviations above its synthetic baseline.",
+      "source_ids": [
+        "SYN-HUMAN-SURV-01"
+      ],
+      "quality": 0.92,
+      "hypothesis_effects": {
+        "natural_zoonotic": 7.0,
+        "accidental_release": 2.0,
+        "deliberate_release": 1.0,
+        "insufficient_evidence": -2.0
+      },
+      "limitations": "A baseline anomaly is a screening signal, not proof of cause or attribution."
+    },
+    {
+      "evidence_id": "EV-CORR-SIG-A-001-SIG-H-001",
+      "finding": "Animal and human anomalies co-occurred in GRID-NE-04 within 30 hours.",
+      "source_ids": [
+        "SYN-ANIMAL-SURV-01",
+        "SYN-HUMAN-SURV-01"
+      ],
+      "quality": 0.86,
+      "hypothesis_effects": {
+        "natural_zoonotic": 28.0,
+        "accidental_release": 7.0,
+        "deliberate_release": 4.0,
+        "insufficient_evidence": -10.0
+      },
+      "limitations": "Spatiotemporal association does not establish transmission direction or pathogen identity."
+    },
+    {
+      "evidence_id": "EV-SPREAD-SIG-A-001-SIG-H-001",
+      "finding": "The synthetic animal anomaly preceded the linked human anomaly by 30 hours, consistent with a spillover hypothesis.",
+      "source_ids": [
+        "SYN-ANIMAL-SURV-01",
+        "SYN-HUMAN-SURV-01"
+      ],
+      "quality": 0.774,
+      "hypothesis_effects": {
+        "natural_zoonotic": 30.0,
+        "accidental_release": -4.0,
+        "deliberate_release": -5.0,
+        "insufficient_evidence": -8.0
+      },
+      "limitations": "Temporal ordering alone cannot demonstrate an epidemiological transmission chain."
+    }
+  ],
+  "uncertainty": [
+    "What pathogen, if any, links the animal and human observations?",
+    "Are the surveillance sources independently corroborated?",
+    "Do paired laboratory results support a common biological cause?"
+  ],
   "recommended_verification": [
     "Obtain targeted laboratory confirmation from both human and animal samples."
   ],
-  "proposed_action": {
-    "action_id": "ACT-LAB-VERIFY",
-    "status": "pending",
-    "human_approval_required": true
+  "proposed_actions": [
+    {
+      "action_id": "ACT-LAB-VERIFY",
+      "title": "Request cross-agency laboratory verification",
+      "owner": "Public-health duty officer",
+      "rationale": "The leading screening hypothesis is natural_zoonotic; laboratory confirmation is required before attribution or escalation.",
+      "consequence": "medium",
+      "status": "pending"
+    }
+  ],
+  "tool_trace": [
+    {
+      "sequence": 1,
+      "tool_name": "correlate_signals",
+      "tool_input": {
+        "rationale": "Check whether unusual human and animal observations align in place and time."
+      },
+      "success": true,
+      "summary": "Added 1 evidence record(s). Decision rationale: Check whether unusual human and animal observations align in place and time.",
+      "latency_ms": 0,
+      "model_id": "replay-policy-v1"
+    },
+    {
+      "sequence": 2,
+      "tool_name": "assess_spread_plausibility",
+      "tool_input": {
+        "rationale": "Test whether the observed temporal order supports the current leading explanation."
+      },
+      "success": true,
+      "summary": "Added 1 evidence record(s). Decision rationale: Test whether the observed temporal order supports the current leading explanation.",
+      "latency_ms": 0,
+      "model_id": "replay-policy-v1"
+    },
+    {
+      "sequence": 3,
+      "tool_name": "recommend_next_check",
+      "tool_input": {
+        "rationale": "Choose the bounded verification step expected to reduce the most material uncertainty.",
+        "candidate_id": "paired-laboratory-confirmation"
+      },
+      "success": true,
+      "summary": "Selected paired-laboratory-confirmation: A cross-domain association is present, but it does not establish a common cause. Decision rationale: Choose the bounded verification step expected to reduce the most material uncertainty.",
+      "latency_ms": 0,
+      "model_id": "replay-policy-v1"
+    }
+  ],
+  "change_log": [],
+  "metrics": {
+    "model_calls": 0,
+    "tool_calls": 3,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "estimated_cost_usd": 0.0,
+    "fallback_used": false,
+    "completed_within_limits": true
   },
-  "notice": "Illustrative replay output; support scores are not probabilities."
+  "source_coverage": []
 }

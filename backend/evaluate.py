@@ -112,7 +112,11 @@ def main() -> int:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(serialised + "\n", encoding="utf-8")
         print(f"Wrote: {args.output.resolve()}")
-    return 0
+    summary = report["summary"]
+    rates = [value for name, value in summary.items() if name.endswith("_rate")]
+    return 0 if report["scenario_count"] and all(value == 1.0 for value in rates) and not (
+        summary["limit_violation_count"] or summary["automatic_action_count"]
+    ) else 1
 
 
 if __name__ == "__main__":
