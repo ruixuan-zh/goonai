@@ -40,7 +40,7 @@
       "tool_calls": 3,
       "model_calls": 0,
       "estimated_cost_usd": 0.0,
-      "recommended_verification": "Repeat the surveillance review after the next reporting interval and check for a new cross-domain match."
+      "recommended_verification": "Request clinical review of the unusual human-health cluster and available diagnostic results."
     },
     {
       "scenario_id": "human_only_signal",
@@ -54,7 +54,7 @@
       "tool_calls": 3,
       "model_calls": 0,
       "estimated_cost_usd": 0.0,
-      "recommended_verification": "Repeat the surveillance review after the next reporting interval and check for a new cross-domain match."
+      "recommended_verification": "Request clinical review of the unusual human-health cluster and available diagnostic results."
     },
     {
       "scenario_id": "imported_outbreak_context",
@@ -68,7 +68,7 @@
       "tool_calls": 4,
       "model_calls": 0,
       "estimated_cost_usd": 0.0,
-      "recommended_verification": "Repeat the surveillance review after the next reporting interval and check for a new cross-domain match."
+      "recommended_verification": "Request clinical review of the unusual human-health cluster and available diagnostic results."
     },
     {
       "scenario_id": "seasonal_outbreak",
@@ -82,7 +82,7 @@
       "tool_calls": 3,
       "model_calls": 0,
       "estimated_cost_usd": 0.0,
-      "recommended_verification": "Repeat the surveillance review after the next reporting interval and check for a new cross-domain match."
+      "recommended_verification": "Request clinical review of the unusual human-health cluster and available diagnostic results."
     },
     {
       "scenario_id": "zoonotic_spillover",

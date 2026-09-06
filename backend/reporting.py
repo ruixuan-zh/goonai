@@ -89,7 +89,9 @@ def build_risk_profile(
         confidence = Confidence.LOW
     leader = assessments[0].hypothesis
     status = _case_status(state, leader, confidence)
-    uncertainty = list(dict.fromkeys(state.open_questions))
+    uncertainty = list(dict.fromkeys(
+        state.open_questions + [gap for review in state.specialist_reviews for gap in review.gaps]
+    ))
     if not uncertainty:
         uncertainty = [
             "The synthetic observations have not been confirmed by laboratory diagnostics.",
@@ -109,7 +111,7 @@ def build_risk_profile(
         known_findings=state.evidence,
         uncertainty=uncertainty,
         recommended_verification=checks,
-        proposed_actions=_actions(status, leader),
+        proposed_actions=state.proposed_actions or _actions(status, leader),
         tool_trace=state.tool_trace,
         change_log=state.change_log,
         metrics=RunMetrics(
@@ -124,6 +126,7 @@ def build_risk_profile(
             ),
         ),
         source_coverage=state.source_coverage,
+        specialist_reviews=state.specialist_reviews,
     )
 
 

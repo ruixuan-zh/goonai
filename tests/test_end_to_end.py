@@ -105,7 +105,7 @@ class EndToEndTests(unittest.TestCase):
     def test_next_check_adapts_to_the_material_evidence_gap(self) -> None:
         expected_candidate = {
             "contradictory_evidence": "corroborate-external-report",
-            "seasonal_outbreak": "repeat-surveillance-review",
+            "seasonal_outbreak": "clinical-cluster-review",
             "zoonotic_spillover": "paired-laboratory-confirmation",
         }
         for scenario_name, candidate_id in expected_candidate.items():

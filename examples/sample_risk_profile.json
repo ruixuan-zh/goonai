@@ -1,8 +1,8 @@
 {
-  "case_id": "BIO-ZOONOTIC_SPILLOVER-5837D3",
+  "case_id": "BIO-ZOONOTIC_SPILLOVER-F14B29",
   "scenario_id": "zoonotic_spillover",
   "scenario_title": "Linked avian mortality and human respiratory cluster",
-  "generated_at": "2026-09-05T15:32:13.199428Z",
+  "generated_at": "2026-09-06T10:36:30.919901Z",
   "status": "investigate",
   "confidence": "high",
   "leading_hypothesis": "natural_zoonotic",
@@ -121,19 +121,54 @@
   "uncertainty": [
     "What pathogen, if any, links the animal and human observations?",
     "Are the surveillance sources independently corroborated?",
-    "Do paired laboratory results support a common biological cause?"
+    "Do paired laboratory results support a common biological cause?",
+    "No supplied environmental measurements; absence is not a negative finding.",
+    "No supplied food measurements; absence is not a negative finding.",
+    "No supplied external measurements; absence is not a negative finding.",
+    "No supplied mobility measurements; absence is not a negative finding.",
+    "Reporting time is unknown for 2 signal(s); do not assume immediate availability.",
+    "Different source identifiers do not prove independent collection; shared upstream provenance requires analyst review.",
+    "No validated transmission forecast or laboratory-supported origin assessment is available in this prototype."
   ],
   "recommended_verification": [
     "Obtain targeted laboratory confirmation from both human and animal samples."
   ],
   "proposed_actions": [
     {
-      "action_id": "ACT-LAB-VERIFY",
-      "title": "Request cross-agency laboratory verification",
-      "owner": "Public-health duty officer",
-      "rationale": "The leading screening hypothesis is natural_zoonotic; laboratory confirmation is required before attribution or escalation.",
-      "consequence": "medium",
-      "status": "pending"
+      "action_id": "ACT-PAIRED-LABORATORY-CONFIRMATION",
+      "title": "Obtain targeted laboratory confirmation from both human and animal samples.",
+      "owner": "CDA and NParks/AVS laboratory liaison",
+      "rationale": "A cross-domain association is present, but it does not establish a common cause.",
+      "consequence": "low",
+      "status": "pending",
+      "evidence_ids": [
+        "EV-ANOM-SIG-A-001",
+        "EV-ANOM-SIG-H-001",
+        "EV-CORR-SIG-A-001-SIG-H-001",
+        "EV-SPREAD-SIG-A-001-SIG-H-001"
+      ],
+      "depends_on": [],
+      "completion_criterion": "Do paired laboratory results support a common biological cause? Record the source, event/reporting times and result, including unavailable or inconclusive outcomes.",
+      "review_trigger": "Review when a source replies or at the next reporting interval; the human owner sets the deadline."
+    },
+    {
+      "action_id": "ACT-JOINT-REASSESSMENT",
+      "title": "Reconcile verification results and update the shared assessment",
+      "owner": "Designated incident coordinator with CDA and relevant agency liaisons",
+      "rationale": "Combine returned findings, unresolved gaps and disagreement before proposing further action.",
+      "consequence": "low",
+      "status": "pending",
+      "evidence_ids": [
+        "EV-ANOM-SIG-A-001",
+        "EV-ANOM-SIG-H-001",
+        "EV-CORR-SIG-A-001-SIG-H-001",
+        "EV-SPREAD-SIG-A-001-SIG-H-001"
+      ],
+      "depends_on": [
+        "ACT-PAIRED-LABORATORY-CONFIRMATION"
+      ],
+      "completion_criterion": "A human reviews returned or explicitly unavailable results and reruns the assessment with new evidence.",
+      "review_trigger": "After verification outcomes are recorded, or earlier if a material new signal arrives."
     }
   ],
   "tool_trace": [
@@ -146,7 +181,8 @@
       "success": true,
       "summary": "Added 1 evidence record(s). Decision rationale: Check whether unusual human and animal observations align in place and time.",
       "latency_ms": 0,
-      "model_id": "replay-policy-v1"
+      "model_id": "replay-policy-v1",
+      "responsible_role": "one_health"
     },
     {
       "sequence": 2,
@@ -157,7 +193,8 @@
       "success": true,
       "summary": "Added 1 evidence record(s). Decision rationale: Test whether the observed temporal order supports the current leading explanation.",
       "latency_ms": 0,
-      "model_id": "replay-policy-v1"
+      "model_id": "replay-policy-v1",
+      "responsible_role": "epidemiology"
     },
     {
       "sequence": 3,
@@ -169,7 +206,8 @@
       "success": true,
       "summary": "Selected paired-laboratory-confirmation: A cross-domain association is present, but it does not establish a common cause. Decision rationale: Choose the bounded verification step expected to reduce the most material uncertainty.",
       "latency_ms": 0,
-      "model_id": "replay-policy-v1"
+      "model_id": "replay-policy-v1",
+      "responsible_role": "verification_coordination"
     }
   ],
   "change_log": [],
@@ -182,5 +220,80 @@
     "fallback_used": false,
     "completed_within_limits": true
   },
-  "source_coverage": []
+  "source_coverage": [],
+  "specialist_reviews": [
+    {
+      "role_id": "clinical_surveillance",
+      "responsibility": "Review clinical signals and request epidemiological confirmation; do not infer a pathogen from symptoms.",
+      "source_ids": [
+        "SYN-HUMAN-SURV-01"
+      ],
+      "findings": [
+        "Reviewed 1 scenario signal(s) and 0 public source coverage record(s)."
+      ],
+      "gaps": []
+    },
+    {
+      "role_id": "one_health",
+      "responsibility": "Review animal, environmental and food coverage; distinguish missing measurements from negative findings.",
+      "source_ids": [
+        "SYN-ANIMAL-SURV-01"
+      ],
+      "findings": [
+        "Reviewed 1 scenario signal(s) and 0 public source coverage record(s)."
+      ],
+      "gaps": [
+        "No supplied environmental measurements; absence is not a negative finding.",
+        "No supplied food measurements; absence is not a negative finding."
+      ]
+    },
+    {
+      "role_id": "external_verification",
+      "responsibility": "Preserve external claims and behavioural context; corroboration does not establish origin or intent.",
+      "source_ids": [],
+      "findings": [
+        "Reviewed 0 scenario signal(s) and 0 public source coverage record(s)."
+      ],
+      "gaps": [
+        "No supplied external measurements; absence is not a negative finding.",
+        "No supplied mobility measurements; absence is not a negative finding."
+      ]
+    },
+    {
+      "role_id": "data_quality",
+      "responsibility": "Review event and reporting times, provenance and dependence before interpreting evidence.",
+      "source_ids": [
+        "SYN-ANIMAL-SURV-01",
+        "SYN-HUMAN-SURV-01"
+      ],
+      "findings": [],
+      "gaps": [
+        "Reporting time is unknown for 2 signal(s); do not assume immediate availability.",
+        "Different source identifiers do not prove independent collection; shared upstream provenance requires analyst review."
+      ]
+    },
+    {
+      "role_id": "epidemiology",
+      "responsibility": "Check temporal and geographical consistency; association is not transmission or a calibrated forecast.",
+      "source_ids": [
+        "SYN-ANIMAL-SURV-01",
+        "SYN-HUMAN-SURV-01"
+      ],
+      "findings": [
+        "The synthetic animal anomaly preceded the linked human anomaly by 30 hours, consistent with a spillover hypothesis."
+      ],
+      "gaps": [
+        "No validated transmission forecast or laboratory-supported origin assessment is available in this prototype."
+      ]
+    },
+    {
+      "role_id": "assessment",
+      "responsibility": "Compare competing explanations and preserve unresolved attribution without counting role agreement as evidence.",
+      "source_ids": [],
+      "findings": [],
+      "gaps": [
+        "No validated transmission forecast or laboratory-supported origin assessment is available in this prototype."
+      ]
+    }
+  ]
 }

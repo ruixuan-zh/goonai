@@ -30,7 +30,7 @@ def anomaly_evidence(signals: list[Signal]) -> list[Evidence]:
             Hypothesis.DELIBERATE_RELEASE: 1.0,
             Hypothesis.INSUFFICIENT_EVIDENCE: -2.0,
         }
-        if signal.domain == Domain.EXTERNAL:
+        if signal.domain in {Domain.EXTERNAL, Domain.MOBILITY} or signal.observation_kind == "behavioural_context":
             effects = {hypothesis: 0.0 for hypothesis in Hypothesis}
         records.append(
             Evidence(
@@ -52,8 +52,8 @@ def correlate_signals(signals: list[Signal], maximum_gap_hours: int = 72) -> lis
     """Find human/animal anomaly pairs in the same coarse location and time window."""
 
     anomalous = detect_anomalies(signals)
-    humans = [signal for signal in anomalous if signal.domain == Domain.HUMAN]
-    animals = [signal for signal in anomalous if signal.domain == Domain.ANIMAL]
+    humans = [signal for signal in anomalous if signal.domain == Domain.HUMAN and signal.observation_kind == "measurement"]
+    animals = [signal for signal in anomalous if signal.domain == Domain.ANIMAL and signal.observation_kind == "measurement"]
     matches: list[Evidence] = []
     maximum_gap = timedelta(hours=maximum_gap_hours)
     for animal in animals:
@@ -101,8 +101,8 @@ def assess_spread_plausibility(signals: list[Signal]) -> list[Evidence]:
     """Evaluate whether the observed order is consistent with animal-to-human spillover."""
 
     anomalous = detect_anomalies(signals)
-    humans = [signal for signal in anomalous if signal.domain == Domain.HUMAN]
-    animals = [signal for signal in anomalous if signal.domain == Domain.ANIMAL]
+    humans = [signal for signal in anomalous if signal.domain == Domain.HUMAN and signal.observation_kind == "measurement"]
+    animals = [signal for signal in anomalous if signal.domain == Domain.ANIMAL and signal.observation_kind == "measurement"]
     plausible_pairs = [
         (animal, human)
         for animal in animals
@@ -168,12 +168,8 @@ def verify_external_reports(signals: list[Signal]) -> list[Evidence]:
     for report in reports:
         summary = report.report_summary or "An external surveillance report was supplied."
         if report.corroborated:
-            effects = {
-                Hypothesis.NATURAL_ZOONOTIC: 12.0,
-                Hypothesis.ACCIDENTAL_RELEASE: 1.0,
-                Hypothesis.DELIBERATE_RELEASE: 0.0,
-                Hypothesis.INSUFFICIENT_EVIDENCE: -4.0,
-            }
+            # Corroboration establishes a claim's reliability, not its causal meaning.
+            effects = {hypothesis: 0.0 for hypothesis in Hypothesis}
             finding = f"Corroborated external report: {summary}"
         else:
             effects = {

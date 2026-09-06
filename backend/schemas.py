@@ -70,6 +70,14 @@ class Signal(BaseModel):
     synthetic: bool = Field(strict=True)
     report_summary: str | None = None
     corroborated: bool | None = None
+    reported_at: AwareDatetime | None = None
+    observation_kind: str = Field(default="measurement", pattern="^(measurement|behavioural_context)$")
+
+    @model_validator(mode="after")
+    def validate_reporting_time(self) -> Signal:
+        if self.reported_at is not None and self.reported_at < self.timestamp:
+            raise ValueError("reported_at cannot precede the observation timestamp")
+        return self
 
     @field_validator("synthetic")
     @classmethod
@@ -168,6 +176,7 @@ class ToolCallRecord(BaseModel):
     summary: str
     latency_ms: int = Field(ge=0)
     model_id: str | None = None
+    responsible_role: str | None = None
 
 
 class ProposedAction(BaseModel):
@@ -177,6 +186,20 @@ class ProposedAction(BaseModel):
     rationale: str
     consequence: str
     status: ActionStatus = ActionStatus.PENDING
+    evidence_ids: list[str] = Field(default_factory=list)
+    depends_on: list[str] = Field(default_factory=list)
+    completion_criterion: str | None = None
+    review_trigger: str | None = None
+
+
+class SpecialistReview(BaseModel):
+    """A deterministic role review, not an independent model opinion."""
+
+    role_id: str
+    responsibility: str
+    source_ids: list[str] = Field(default_factory=list)
+    findings: list[str] = Field(default_factory=list)
+    gaps: list[str] = Field(default_factory=list)
 
 
 class RunMetrics(BaseModel):
@@ -226,6 +249,8 @@ class CaseState(BaseModel):
     output_tokens: int = 0
     fallback_used: bool = False
     source_coverage: list[SourceCoverage] = Field(default_factory=list)
+    specialist_reviews: list[SpecialistReview] = Field(default_factory=list)
+    proposed_actions: list[ProposedAction] = Field(default_factory=list)
 
 
 class RiskProfile(BaseModel):
@@ -245,3 +270,4 @@ class RiskProfile(BaseModel):
     change_log: list[str] = Field(default_factory=list)
     metrics: RunMetrics
     source_coverage: list[SourceCoverage] = Field(default_factory=list)
+    specialist_reviews: list[SpecialistReview] = Field(default_factory=list)

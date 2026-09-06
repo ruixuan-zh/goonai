@@ -49,6 +49,8 @@ def score_hypotheses(evidence: list[Evidence]) -> list[HypothesisAssessment]:
 def estimate_confidence(
     assessments: list[HypothesisAssessment], evidence: list[Evidence]
 ) -> Confidence:
+    # Context-only records must not boost confidence or source counts.
+    evidence = [item for item in evidence if any(item.hypothesis_effects.values())]
     if not evidence:
         return Confidence.LOW
     margin = assessments[0].support_score - assessments[1].support_score

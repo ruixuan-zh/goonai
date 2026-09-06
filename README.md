@@ -39,6 +39,10 @@ Six scenarios are supplied:
 
 Support scores are transparent decision aids. They are **not probabilities** and have not been clinically calibrated.
 
+The revised problem statement and the book's Day Three section informed a [research-backed role refinement](docs/ROLE_REFINEMENT_RESEARCH.md). The controller now receives six deterministic specialist reviews covering clinical surveillance, One Health, external verification, data quality, epidemiology and assessment. Verification proposals have illustrative Singapore owners, evidence references, completion criteria and a joint-review dependency. These reviews use the existing bounded controller without adding separate model calls.
+
+Scenario signals can optionally supply `reported_at` and `observation_kind="behavioural_context"`. Reporting delays remain visible, and mobility or behavioural reactions do not become biological-origin evidence. A corroborated external scenario report no longer automatically favours a natural origin. These are reasoning and coordination safeguards; improved real-world predictive accuracy has not been demonstrated.
+
 ## Repository layout
 
 ```text
@@ -53,6 +57,7 @@ goonai/
 │   ├── analytics.py            # Deterministic analytical tools
 │   ├── hypothesis_scoring.py   # Evidence-weighted support scoring
 │   ├── orchestrator.py         # Replay/Bedrock controller and limits
+│   ├── specialists.py          # Functional reviews and simulated task routing
 │   ├── reporting.py            # Risk brief and approval gate
 │   ├── evaluate.py             # Deterministic scenario evaluation
 │   └── run_demo.py             # Command-line demonstration
