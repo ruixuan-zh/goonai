@@ -1,4 +1,4 @@
-"""Command-line entry point for a reproducible BIO-SIGNAL demonstration."""
+"""Command-line entry point for a reproducible goonai demonstration."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from .scenario_loader import available_scenarios, load_scenario
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run a bounded BIO-SIGNAL scenario")
+    parser = argparse.ArgumentParser(description="Run a bounded goonai scenario")
     parser.add_argument(
         "--scenario",
         choices=available_scenarios(),

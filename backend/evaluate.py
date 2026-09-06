@@ -1,4 +1,4 @@
-"""Run the deterministic BIO-SIGNAL regression evaluation suite."""
+"""Run the deterministic goonai regression evaluation suite."""
 
 from __future__ import annotations
 
@@ -98,7 +98,7 @@ def evaluate_replay_suite() -> dict[str, Any]:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Evaluate all curated BIO-SIGNAL scenarios")
+    parser = argparse.ArgumentParser(description="Evaluate all curated goonai scenarios")
     parser.add_argument("--output", type=Path, help="Optional JSON output path")
     return parser
 

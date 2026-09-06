@@ -1,4 +1,4 @@
-"""BIO-SIGNAL prototype package."""
+"""goonai prototype package."""
 
 from .orchestrator import BioSignalOrchestrator
 

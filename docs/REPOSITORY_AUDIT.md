@@ -1,10 +1,10 @@
-# BIO-SIGNAL repository audit
+# goonai repository audit
 
 Audit date: 5 September 2026.
 
 ## Assessment
 
-BIO-SIGNAL is a coherent, small decision-support demonstration. Its useful contribution is assembling fragmented observations into a traceable investigation brief, exposing missing evidence and giving an officer a bounded next verification step. It is suitable for continued prototype development. It is not yet a validated biological-risk assessment service, and passing its tests must not be presented as evidence of clinical or attribution accuracy.
+goonai is a coherent, small decision-support demonstration. Its useful contribution is assembling fragmented observations into a traceable investigation brief, exposing missing evidence and giving an officer a bounded next verification step. It is suitable for continued prototype development. It is not yet a validated biological-risk assessment service, and passing its tests must not be presented as evidence of clinical or attribution accuracy.
 
 This audit reviewed every tracked Python module, scenario, test file, dependency declaration, workflow and example, together with the README and handover guide. It covered data contracts, parsing, source boundaries, analytical assumptions, orchestration, cost accounting, output integrity, UI interactions, dependencies and documentation. Local credentials were not inspected or used for paid model calls.
 

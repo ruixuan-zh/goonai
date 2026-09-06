@@ -145,7 +145,7 @@ class EndToEndTests(unittest.TestCase):
         client._client = runtime
         client.model_id = "global.anthropic.claude-sonnet-5"
         client.max_output_tokens = 300
-        result = client.choose({"case_id": "BIO-TEST"}, ["correlate_signals"])
+        result = client.choose({"case_id": "GOONAI-TEST"}, ["correlate_signals"])
         self.assertEqual(result.decision.tool_name, "correlate_signals")
         self.assertTrue(result.decision.tool_input["rationale"])
         self.assertEqual(result.input_tokens, 90)

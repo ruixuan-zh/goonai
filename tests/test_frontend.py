@@ -18,8 +18,8 @@ class FrontendSmokeTests(unittest.TestCase):
         start_button = next(button for button in app.button if button.label == "Start investigation")
         app = start_button.click().run(timeout=15)
         self.assertFalse(app.exception)
-        self.assertTrue(any(metric.label == "Case status" for metric in app.metric))
-        self.assertTrue(any(header.value == "Agent trace" for header in app.header))
+        self.assertTrue(any("case-banner investigate" in item.value for item in app.markdown))
+        self.assertTrue(any(expander.label.startswith("Agent trace") for expander in app.expander))
 
     def test_evidence_can_only_be_injected_once_per_investigation(self) -> None:
         from streamlit.testing.v1 import AppTest
@@ -28,8 +28,11 @@ class FrontendSmokeTests(unittest.TestCase):
         app = AppTest.from_file(str(app_path)).run(timeout=15)
         app.radio[0].set_value("Curated scenario").run()
         next(button for button in app.button if button.label == "Start investigation").click().run()
+        case_id = app.session_state.profile.case_id
         next(button for button in app.button if button.label == "Inject new synthetic evidence").click().run()
         self.assertFalse(app.exception)
+        self.assertEqual(app.session_state.profile.case_id, case_id)
+        self.assertIn("Evidence ledger: 4 → 5 findings", app.session_state.profile.change_log[-1])
         self.assertTrue(next(button for button in app.button if button.label == "Inject new synthetic evidence").disabled)
         next(button for button in app.button if button.label == "Start investigation").click().run()
         self.assertFalse(next(button for button in app.button if button.label == "Inject new synthetic evidence").disabled)
@@ -41,6 +44,7 @@ class FrontendSmokeTests(unittest.TestCase):
 
         app_path = Path(__file__).resolve().parent.parent / "frontend" / "app.py"
         app = AppTest.from_file(str(app_path)).run(timeout=15)
+        app.radio[0].set_value("Singapore public data").run()
         bundle = PublicDataBundle(retrieved_at=NOW)
         with patch("backend.public_sources.collect_singapore_public_data", return_value=bundle):
             next(button for button in app.button if button.label == "Start investigation").click().run()

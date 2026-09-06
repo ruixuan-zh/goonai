@@ -1,13 +1,13 @@
-# BIO-SIGNAL testing and project handover
+# goonai testing and project handover
 
-This guide is for reviewers who want to test BIO-SIGNAL and contributors who
+This guide is for reviewers who want to test goonai and contributors who
 need to continue the project. Start with replay mode: it is deterministic,
 offline and does not require an AWS account. Public-data and Bedrock modes are
 optional integration tests.
 
 ## Scope and safety boundary
 
-BIO-SIGNAL is a Singapore-focused hackathon proof of concept for biological
+goonai is a Singapore-focused hackathon proof of concept for biological
 anomaly decision support. It correlates evidence, compares natural, accidental,
 deliberate and insufficient-evidence explanations, and recommends a next
 verification step. It is not a diagnostic system, an attack-attribution model
@@ -158,7 +158,7 @@ BEDROCK_MODEL_ID=global.anthropic.claude-sonnet-5
 
 ```dotenv
 AWS_REGION=us-east-1
-AWS_PROFILE=bio-signal
+AWS_PROFILE=goonai
 BEDROCK_MODEL_ID=global.anthropic.claude-sonnet-5
 ```
 
@@ -181,11 +181,11 @@ The remaining controls are:
 
 | Variable | Default | Meaning |
 |---|---:|---|
-| `BIO_SIGNAL_MAX_MODEL_CALLS` | `4` | Maximum model attempts, including failed requests, in one investigation |
-| `BIO_SIGNAL_MAX_TOOL_CALLS` | `6` | Maximum local tool executions |
-| `BIO_SIGNAL_MAX_OUTPUT_TOKENS` | `300` | Output-token cap per model decision |
-| `BIO_SIGNAL_SESSION_BUDGET_USD` | `1.00` | Per-investigation estimated-cost guard |
-| `BIO_SIGNAL_FALLBACK_TO_REPLAY` | `true` | Continue safely with replay if Bedrock fails |
+| `GOONAI_MAX_MODEL_CALLS` | `4` | Maximum model attempts, including failed requests, in one investigation |
+| `GOONAI_MAX_TOOL_CALLS` | `6` | Maximum local tool executions |
+| `GOONAI_MAX_OUTPUT_TOKENS` | `300` | Output-token cap per model decision |
+| `GOONAI_SESSION_BUDGET_USD` | `1.00` | Per-investigation estimated-cost guard |
+| `GOONAI_FALLBACK_TO_REPLAY` | `true` | Continue safely with replay if Bedrock fails |
 
 The budget variable is not an AWS account-wide spending cap. Configure an AWS
 Budget separately. The application uses conservative planning assumptions of
@@ -197,7 +197,7 @@ Validate live mode with replay fallback disabled so a credential or model-access
 problem cannot look like a successful model run:
 
 ```dotenv
-BIO_SIGNAL_FALLBACK_TO_REPLAY=false
+GOONAI_FALLBACK_TO_REPLAY=false
 ```
 
 ```powershell

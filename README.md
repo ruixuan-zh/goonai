@@ -1,6 +1,6 @@
-# BIO-SIGNAL
+# goonai
 
-BIO-SIGNAL implements the target stated in the Agentic AI Biodefence problem statement: when a biological anomaly is detected in Singapore, help government health-security decision-makers correlate fragmented human, animal, environmental, food, mobility and external-intelligence signals; compare natural, accidental and deliberate explanations; identify the most valuable missing evidence; and prepare a timely, evidence-linked risk profile for human action.
+goonai implements the target stated in the Agentic AI Biodefence problem statement: when a biological anomaly is detected in Singapore, help government health-security decision-makers correlate fragmented human, animal, environmental, food, mobility and external-intelligence signals; compare natural, accidental and deliberate explanations; identify the most valuable missing evidence; and prepare a timely, evidence-linked risk profile for human action.
 
 The prototype's point-of-view statement is: **a Singapore public-health surveillance duty officer responding to a suspected cross-domain anomaly needs a quick way to assemble traceable evidence and identify the next verification step, because the relevant public indicators are published separately and important animal-health and wastewater measurements may be unavailable publicly.** The repository demonstrates the technical fragmentation through its source manifest and coverage reporting. This statement is not presented as interview-validated or as a measured operational baseline; those claims require evidence from the intended users.
 
@@ -119,8 +119,8 @@ The default model is `global.anthropic.claude-sonnet-5`, invoked through the Bed
 Use an AWS profile or IAM role where possible:
 
 ```powershell
-aws configure --profile bio-signal
-# Set AWS_PROFILE=bio-signal in .env
+aws configure --profile goonai
+# Set AWS_PROFILE=goonai in .env
 python -m backend.run_demo --public-data --mode live
 ```
 
@@ -227,7 +227,7 @@ Useful demonstration metrics are already included in each JSON risk profile: mod
 - Z-score screening assumes a meaningful baseline and does not handle seasonality, reporting delay or small-count statistics rigorously.
 - Public pages can change structure; source failures are visible, but parsers require maintenance.
 - The public-data path is a current differential risk screen, not a validated incidence or spread forecast.
-- AVS animal-surveillance measurements and NEA wastewater viral measurements are not publicly exposed at useful granularity. Without authorised access, BIO-SIGNAL cannot perform the full cross-domain assessment described in the national-scale vision.
+- AVS animal-surveillance measurements and NEA wastewater viral measurements are not publicly exposed at useful granularity. Without authorised access, goonai cannot perform the full cross-domain assessment described in the national-scale vision.
 - Current environmental readings are contextual snapshots. Reliable lagged weather features require regular snapshot collection or an approved historical archive.
 - The prototype does not identify pathogens, infer intent from absence of evidence, or automate notifications.
 - AWS availability, privacy classification, retention, encryption, audit logging and cross-border transfer require separate production review.

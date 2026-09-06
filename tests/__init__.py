@@ -1,1 +1,1 @@
-"""BIO-SIGNAL test suite."""
+"""goonai test suite."""

@@ -1,4 +1,4 @@
-"""Validated data contracts shared by the BIO-SIGNAL pipeline."""
+"""Validated data contracts shared by the goonai pipeline."""
 
 from __future__ import annotations
 

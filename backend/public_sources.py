@@ -32,7 +32,7 @@ from .schemas import (
 
 
 SGT = timezone(timedelta(hours=8))
-USER_AGENT = "BIO-SIGNAL-Hackathon/1.0 (public-data research prototype)"
+USER_AGENT = "goonai-Hackathon/1.0 (public-data research prototype)"
 ALLOWED_HOSTS = {
     "www.cda.gov.sg",
     "isomer-user-content.by.gov.sg",
