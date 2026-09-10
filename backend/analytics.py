@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import timedelta
+from itertools import combinations
 
-from .schemas import Domain, Evidence, Hypothesis, Signal
+from .schemas import Domain, EventGraph, EventLink, EventNode, Evidence, Hypothesis, Signal
 
 
 ANOMALY_THRESHOLD = 2.0
@@ -17,6 +18,35 @@ def calculate_z_score(signal: Signal) -> float:
 
 def detect_anomalies(signals: list[Signal], threshold: float = ANOMALY_THRESHOLD) -> list[Signal]:
     return [signal for signal in signals if calculate_z_score(signal) >= threshold]
+
+
+def build_event_graph(signals: list[Signal], maximum_gap_hours: int = 72) -> EventGraph:
+    """Link cross-domain anomalies and supplied context without adding scoring weight."""
+
+    anomalous_ids = {signal.signal_id for signal in detect_anomalies(signals)}
+    nodes = [EventNode(
+        signal_id=signal.signal_id, timestamp=signal.timestamp, domain=signal.domain,
+        location_cell=signal.location_cell, source_id=signal.source_id,
+        provenance=signal.provenance, anomalous=signal.signal_id in anomalous_ids,
+        contextual=(signal.domain in {Domain.EXTERNAL, Domain.MOBILITY}
+                    or signal.observation_kind == "behavioural_context"),
+    ) for signal in signals]
+    links = []
+    for left, right in combinations(nodes, 2):
+        gap_hours = abs((left.timestamp - right.timestamp).total_seconds()) / 3600
+        if (left.domain == right.domain or left.location_cell != right.location_cell
+                or gap_hours > maximum_gap_hours):
+            continue
+        if not ((left.anomalous or left.contextual) and (right.anomalous or right.contextual)):
+            continue
+        links.append(EventLink(
+            signal_ids=(left.signal_id, right.signal_id), gap_hours=gap_hours,
+            relationship="contextual_association" if left.contextual or right.contextual else "co_occurrence",
+        ))
+    return EventGraph(nodes=nodes, links=links, limitations=(
+        f"Links use the same coarse cell and a {maximum_gap_hours}-hour window. They show association, "
+        "not causality, transmission, source independence or origin. Context links do not affect scores."
+    ))
 
 
 def anomaly_evidence(signals: list[Signal]) -> list[Evidence]:
@@ -83,7 +113,7 @@ def correlate_signals(signals: list[Signal], maximum_gap_hours: int = 72) -> lis
     return [
         Evidence(
             evidence_id="EV-CORR-NONE",
-            finding=f"No signal-level cross-domain anomaly pair met the {maximum_gap_hours}-hour and same-location screening rule.",
+            finding=f"No human/animal anomaly pair met the {maximum_gap_hours}-hour and same-location screening rule.",
             source_ids=sorted({signal.source_id for signal in anomalous}),
             quality=0.75,
             hypothesis_effects={

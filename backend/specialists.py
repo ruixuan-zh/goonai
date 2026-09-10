@@ -23,11 +23,11 @@ RESPONSIBILITIES = {
     "assessment": "Compare competing explanations and preserve unresolved attribution without counting role agreement as evidence.",
 }
 TOOL_ROLES = {
-    "correlate_signals": "one_health",
+    "correlate_signals": "correlation",
     "assess_spread_plausibility": "epidemiology",
-    "verify_external_report": "external_verification",
-    "recommend_next_check": "verification_coordination",
-    "finish_investigation": "assessment",
+    "verify_external_report": "external_intel",
+    "recommend_next_check": "verification",
+    "finish_investigation": "briefing",
 }
 TASK_OWNERS = {
     "corroborate-external-report": "Authorised external-information liaison",

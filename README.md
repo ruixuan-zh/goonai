@@ -1,4 +1,6 @@
-# goonai
+# BIO-SIGNAL by GoonAI
+
+This repository (`goonai`) implements the hackathon proof of concept described in **BIO-SIGNAL_Slides.pdf**. See [the slide alignment review](docs/SLIDE_ALIGNMENT.md) for the mapping of every workflow stage, the eight specialist functions, verified behaviour and capabilities reserved for the later roadmap.
 
 goonai implements the target stated in the Agentic AI Biodefence problem statement: when a biological anomaly is detected in Singapore, help government health-security decision-makers correlate fragmented human, animal, environmental, food, mobility and external-intelligence signals; compare natural, accidental and deliberate explanations; identify the most valuable missing evidence; and prepare a timely, evidence-linked risk profile for human action.
 
@@ -10,7 +12,7 @@ The repository is sized for a hackathon build that can be understood, run and de
 
 ## Demonstrated outcome
 
-The primary path uses current public Singapore sources. Curated synthetic cases remain available to test spillover, benign and contradictory situations that public aggregate feeds cannot safely expose:
+The UI starts with curated synthetic cases to demonstrate spillover, benign and contradictory situations. An optional current-public-data path assembles Singapore aggregate sources, with explicit gaps where those feeds cannot support the same investigation:
 
 ```text
 allow-listed Singapore public sources
@@ -41,7 +43,13 @@ Support scores are transparent decision aids. They are **not probabilities** and
 
 The revised problem statement and the book's Day Three section informed a [research-backed role refinement](docs/ROLE_REFINEMENT_RESEARCH.md). The controller now receives six deterministic specialist reviews covering clinical surveillance, One Health, external verification, data quality, epidemiology and assessment. Verification proposals have illustrative Singapore owners, evidence references, completion criteria and a joint-review dependency. These reviews use the existing bounded controller without adding separate model calls.
 
-Scenario signals can optionally supply `reported_at` and `observation_kind="behavioural_context"`. Reporting delays remain visible, and mobility or behavioural reactions do not become biological-origin evidence. A corroborated external scenario report no longer automatically favours a natural origin. These are reasoning and coordination safeguards; improved real-world predictive accuracy has not been demonstrated.
+Scenario signals can optionally supply `reported_at` and `observation_kind="behavioural_context"`. Reporting delays remain visible, and mobility or behavioural reactions do not become biological-origin evidence. Corroborated external scenario reports and unlinked public context do not automatically favour an origin. These are reasoning and coordination safeguards; improved real-world predictive accuracy has not been demonstrated.
+
+The eight slide functions are **Sentinel, Correlation, Epidemiology, Threat Assessment, OSINT / External Intel, Verification, Coordination and Briefing**. They use deterministic tools around one bounded controller, with the existing six specialist reviews supplying domain and data-quality checks. Each risk profile reports what these functions actually completed or could not assess. They are not independent model opinions or continuously running workers.
+
+Synthetic cases now include a provenance-linked event graph across all six domains. Co-occurrence and contextual links are distinguished; the established origin scoring still uses the narrower human/animal checks. The brief reports impact as unassessed when severity and exposure data are missing. One primary verification check is identified separately from supporting tasks. Approved proposals can be assigned locally with a deadline, acknowledged and completed with a recorded result; joint review waits for its prerequisites. This simulation sends no notifications and has no authenticated agency identities.
+
+Evidence injection uses a shared backend reassessment operation. It retains the case ID and archives the previous evidence, scores, decisions, task results and run metrics in `previous_assessments`. Each new revision requires fresh proposal approval. The CLI's `--include-new-evidence` demonstrates both the initial assessment and the update; model/tool limits apply separately to each revision. Task-result text is retained locally and does not become scored evidence automatically.
 
 ## Repository layout
 
@@ -58,6 +66,8 @@ goonai/
 │   ├── hypothesis_scoring.py   # Evidence-weighted support scoring
 │   ├── orchestrator.py         # Replay/Bedrock controller and limits
 │   ├── specialists.py          # Functional reviews and simulated task routing
+│   ├── agent_functions.py      # Eight slide functions and actual completion states
+│   ├── coordination.py         # Local assignment, acknowledgement and results
 │   ├── reporting.py            # Risk brief and approval gate
 │   ├── evaluate.py             # Deterministic scenario evaluation
 │   └── run_demo.py             # Command-line demonstration
@@ -180,7 +190,7 @@ For a later pilot, add ingestion adapters outside the orchestration loop, retain
 4. For synthetic scenarios, `analytics.py` performs z-score, time, geography and temporal checks. Public aggregates lack comparable signal-level locations and times, so public mode proceeds from its compact source evidence directly to verification selection. The controller sees only a compact packet and chooses an available approved tool with a concise rationale.
 5. The application derives a bounded list of safe verification candidates from the current evidence. The controller may select among them but cannot invent or dispatch an operational action.
 6. `hypothesis_scoring.py` combines visible weights and evidence quality. No model-generated number enters the score.
-7. `reporting.py` caps confidence when critical public domains are missing and requires a person to approve or reject every proposed action.
+7. `reporting.py` caps confidence when critical public domains are missing, builds the executive brief and impact limitations, and records human approval or rejection. `coordination.py` tracks approved tasks locally, enforcing deadlines and completed prerequisites before assignment.
 
 Sonnet 5 rejects non-default sampling settings, so the request omits `temperature`; automatic tool selection avoids forcing a tool while thinking is enabled. Responses without exactly one valid choice trigger the configured fallback. See the [Sonnet 5 migration notes](https://platform.claude.com/docs/en/models/sonnet-5/whats-new-sonnet-5) and [Bedrock thinking constraints](https://docs.aws.amazon.com/bedrock/latest/userguide/claude-messages-extended-thinking.html). The 300-token default includes any thinking output and may need adjustment after a live smoke test.
 
@@ -188,12 +198,10 @@ The replay policy follows the same available-tool rules as Sonnet. It is not a p
 
 ## Tests and evaluation
 
-The suite uses standard-library `unittest`, with Pydantic required by the core. Install `requirements.txt` to run the complete suite, including PDF parser and Streamlit checks. Pytest also discovers the tests. The synthetic replay runtime does not import the optional PDF reader, Streamlit or boto3.
+The suite contains both standard-library `unittest` tests and pytest-style specialist/workflow tests. Use **pytest for the complete suite**; unittest discovery omits the pytest-style checks. Install `requirements.txt` to include PDF parser and Streamlit checks. The synthetic replay runtime does not import the optional PDF reader, Streamlit or boto3.
 
 ```powershell
-python -m unittest discover -s tests -v
-# or
-pytest -q
+python -m pytest -q
 
 # Reproduce the committed scenario-evaluation baseline
 python -m backend.evaluate
@@ -216,6 +224,8 @@ The suite covers:
 - a bounded current-public-data assessment path;
 - completion within model/tool limits.
 
+Slide-alignment checks also cover all eight function reports, six-domain graph links, context-neutral public scoring, input sensitivity labels, approval/dependency gates, acknowledgement/results, preserved assessment history and the complete local UI task lifecycle.
+
 GitHub Actions repeats the offline test and evaluation commands on Python 3.11 and 3.12. Full setup, live-mode checks, extension guidance and release checks are in [docs/TESTING_AND_HANDOVER.md](docs/TESTING_AND_HANDOVER.md).
 
 Useful demonstration metrics are already included in each JSON risk profile: model calls, tool calls, token usage, estimated cost, replay fallback and completion within limits. For a fuller evaluation, run each scenario repeatedly in live mode and compare tool-sequence completion, expected leading hypothesis, unsupported-claim count, total tokens, latency and human-review agreement.
@@ -230,6 +240,8 @@ Useful demonstration metrics are already included in each JSON risk profile: mod
 - AVS animal-surveillance measurements and NEA wastewater viral measurements are not publicly exposed at useful granularity. Without authorised access, goonai cannot perform the full cross-domain assessment described in the national-scale vision.
 - Current environmental readings are contextual snapshots. Reliable lagged weather features require regular snapshot collection or an approved historical archive.
 - The prototype does not identify pathogens, infer intent from absence of evidence, or automate notifications.
+- Collection is on demand. Continuous ingestion, historical time-series storage, general natural-origin modelling, calibrated confidence and the slide 8 analyst/expert benefit measures remain unimplemented or unvalidated.
+- Sensitivity labels accept `synthetic` scenario data and `public` observations only; these labels are not content inspection, access control or authorisation to process private data. Human decisions are self-reported local records, persisted only through JSON export.
 - AWS availability, privacy classification, retention, encryption, audit logging and cross-border transfer require separate production review.
 - Evidence suggesting deliberate release is never treated as attribution; the prototype can only recommend further human-led verification.
 

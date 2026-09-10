@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,12 +21,14 @@ except ImportError:
 import streamlit as st
 
 from backend.orchestrator import BioSignalOrchestrator
+from backend.coordination import acknowledge_action, assign_action, complete_action
 from backend.public_sources import collect_singapore_public_data
 from backend.reporting import decide_action
 from backend.scenario_loader import available_scenarios, load_scenario
+from backend.schemas import ActionStatus, TaskStatus
 
 
-st.set_page_config(page_title="goonai", page_icon="◉", layout="wide")
+st.set_page_config(page_title="BIO-SIGNAL · GoonAI", page_icon="◉", layout="wide")
 
 # --- Presentation helpers -------------------------------------------------
 # Interactive controls stay native Streamlit widgets so behaviour and the
@@ -45,7 +48,7 @@ HYPOTHESIS_CLASS = {
 PIPELINE = [
     ("Ingest signals", "Normalise observations"),
     ("Correlate &amp; assess", "One Health + epidemiology"),
-    ("Compare explanations", "Four competing causes"),
+    ("Compare explanations", "Three origins + unresolved evidence"),
     ("Recommend &amp; approve", "Human verification gate"),
 ]
 
@@ -107,7 +110,7 @@ def status_banner_html(profile) -> str:
         f'</div>'
         f'<div class="case-facts"><div><span>Leading explanation</span>'
         f'<strong>{esc(pretty(profile.leading_hypothesis.value))}</strong></div>'
-        f'<div><span>Confidence</span><strong>{esc(profile.confidence.value.title())}</strong></div></div>'
+        f'<div><span>Heuristic confidence</span><strong>{esc(profile.confidence.value.title())}</strong></div></div>'
         f'</section>'
     )
 
@@ -153,16 +156,52 @@ def render_action(profile, action) -> None:
     st.markdown(f"**{action.title}**")
     st.caption(f"Owner: {action.owner} · Consequence: {action.consequence}")
     st.write(action.rationale)
+    st.caption(f"Evidence: {', '.join(action.evidence_ids) or 'No evidence linked'}")
+    if action.completion_criterion:
+        st.write(f"Completion: {action.completion_criterion}")
+    if action.depends_on:
+        st.caption(f"Prerequisites: {', '.join(action.depends_on)}")
+    key = f"{profile.case_id}-{profile.revision}-{action.action_id}"
+    actor = st.text_input("Reviewer / task recorder (self-reported)", value="Local demo reviewer", key=f"actor-{key}")
+    pending = action.status == ActionStatus.PENDING
     approve_col, reject_col = st.columns(2)
-    if approve_col.button("Approve", key=f"approve-{action.action_id}", use_container_width=True):
-        decide_action(profile, action.action_id, True)
+    approve = approve_col.button("Approve", key=f"approve-{key}", disabled=not pending or not actor.strip(), use_container_width=True)
+    reject = reject_col.button("Reject", key=f"reject-{key}", disabled=not pending or not actor.strip(), use_container_width=True)
+    if approve or reject:
+        decide_action(profile, action.action_id, approve, actor=actor)
         st.session_state.profile = profile
         st.rerun()
-    if reject_col.button("Reject", key=f"reject-{action.action_id}", use_container_width=True):
-        decide_action(profile, action.action_id, False)
-        st.session_state.profile = profile
-        st.rerun()
-    st.caption(f"Decision: {action.status.value}")
+    st.caption(f"Decision: {action.status.value} · Task: {action.task_status.value}")
+    if action.due_at:
+        overdue = action.due_at < datetime.now(timezone.utc) and action.task_status != TaskStatus.COMPLETED
+        st.caption(f"Deadline: {action.due_at:%Y-%m-%d %H:%M %Z}" + (" · Overdue" if overdue else ""))
+    if action.result:
+        st.write(f"Recorded result: {action.result}")
+    if action.status != ActionStatus.APPROVED:
+        return
+    try:
+        if action.task_status == TaskStatus.UNASSIGNED:
+            actions = {item.action_id: item for item in profile.proposed_actions}
+            blocked = any(dependency not in actions or actions[dependency].task_status != TaskStatus.COMPLETED
+                          for dependency in action.depends_on)
+            if blocked:
+                st.info("Complete the prerequisite tasks before assigning this follow-on review.")
+            hours = st.number_input("Deadline in hours from assignment", min_value=1, max_value=720, value=24, key=f"deadline-{key}")
+            if st.button("Assign locally", key=f"assign-{key}", disabled=blocked or not actor.strip()):
+                assign_action(profile, action.action_id, actor=actor, due_at=datetime.now(timezone.utc) + timedelta(hours=hours))
+                st.rerun()
+        elif action.task_status == TaskStatus.ASSIGNED:
+            if st.button("Record acknowledgement", key=f"ack-{key}", disabled=not actor.strip()):
+                acknowledge_action(profile, action.action_id, actor=actor)
+                st.rerun()
+        elif action.task_status == TaskStatus.ACKNOWLEDGED:
+            result = st.text_area("Verification result (synthetic or public only)", key=f"result-{key}",
+                                  help="Include provenance, reporting time and unavailable or inconclusive outcomes. Text is retained locally and does not change hypothesis scores.")
+            if st.button("Record completion", key=f"complete-{key}", disabled=not result.strip() or not actor.strip()):
+                complete_action(profile, action.action_id, actor=actor, result=result)
+                st.rerun()
+    except ValueError as exc:
+        st.error(str(exc))
 
 
 st.markdown(
@@ -305,9 +344,9 @@ st.markdown(
 
 st.markdown(
     '<div class="hero"><div class="hero-mark"></div>'
-    '<div class="hero-word">goonai</div></div>'
+    '<div class="hero-word">BIO-SIGNAL</div></div>'
     '<p class="hero-tag">Agentic biological-risk triage for Singapore — connects fragmented '
-    'signals and recommends what a human should verify next.</p>',
+    'signals and recommends what a human should verify next. By GoonAI.</p>',
     unsafe_allow_html=True,
 )
 st.markdown(pipeline_html(), unsafe_allow_html=True)
@@ -407,10 +446,10 @@ if source_mode == "Curated scenario" and scenario.new_evidence_signals:
     update_copy, update_action = st.columns([3, 1])
     with update_copy:
         if st.session_state.get("evidence_injected", False):
-            st.success("New corroborating evidence added. The case assessment has been updated.")
+            st.success("New evidence added. The previous assessment and decisions remain in the case history.")
         else:
             st.markdown("**New evidence is available**")
-            st.caption("A neighbouring surveillance unit reports unusual wild-bird mortality in the same area.")
+            st.caption(f"{len(scenario.new_evidence_signals)} supplied synthetic observation(s) can be added to this case.")
     inject_evidence = update_action.button(
         "Inject new synthetic evidence",
         type="primary",
@@ -418,31 +457,9 @@ if source_mode == "Curated scenario" and scenario.new_evidence_signals:
         use_container_width=True,
     )
     if inject_evidence:
-        previous_leader = profile.leading_hypothesis.value
-        previous_confidence = profile.confidence.value
-        previous_evidence_count = len(profile.known_findings)
-        previous_uncertainty_count = len(profile.uncertainty)
-        previous_scores = {
-            assessment.hypothesis: assessment.support_score for assessment in profile.hypotheses
-        }
         try:
             with st.spinner("Re-assessing with the evidence packet…"):
-                updated = BioSignalOrchestrator(mode=mode).run(scenario, include_new_evidence=True)
-            updated.case_id = profile.case_id
-            score_changes = []
-            for assessment in updated.hypotheses:
-                change = assessment.support_score - previous_scores.get(assessment.hypothesis, 0)
-                if change:
-                    label = pretty(assessment.hypothesis.value)
-                    score_changes.append(f"{label} {change:+d}")
-            score_summary = ", ".join(score_changes) or "no support-score movement"
-            updated.change_log.append(
-                f"Evidence ledger: {previous_evidence_count} → {len(updated.known_findings)} findings; "
-                f"uncertainty: {previous_uncertainty_count} → {len(updated.uncertainty)} open questions; "
-                f"leading hypothesis: {pretty(previous_leader)} → {pretty(updated.leading_hypothesis.value)}; "
-                f"confidence: {previous_confidence.title()} → {updated.confidence.value.title()}; "
-                f"support shifts: {score_summary}."
-            )
+                updated = BioSignalOrchestrator(mode=mode).reassess(scenario, profile)
             st.session_state.profile = updated
             st.session_state.evidence_injected = True
             st.rerun()
@@ -497,17 +514,48 @@ with assessment_col:
 
 with verification_col:
     st.header("Recommended next check")
-    for check in profile.recommended_verification:
-        st.markdown(f"**{check}**")
+    st.caption("The primary check is shown first; supporting checks and joint review follow below.")
     st.caption("The system proposes; a person decides. No action is dispatched automatically.")
+    st.caption("Coordination is a local simulation. Reviewer labels are self-reported; no agency receives these tasks.")
 
     if profile.proposed_actions:
         with st.container(border=True):
             render_action(profile, profile.proposed_actions[0])
     if len(profile.proposed_actions) > 1:
-        with st.expander("Follow-on coordination step"):
+        with st.expander("Supporting checks and joint review"):
             for action in profile.proposed_actions[1:]:
                 render_action(profile, action)
+
+with st.expander("Executive brief and impact"):
+    st.write(profile.executive_brief)
+    st.write(profile.impact.summary)
+    st.caption(f"Input sensitivity: {profile.sensitivity} · Severity: {profile.impact.severity}")
+    st.caption("Anomalous domains: " + (", ".join(domain.value for domain in profile.impact.affected_domains) or "unassessed"))
+
+with st.expander(f"Specialist functions · {len(profile.agent_functions)}"):
+    st.caption("One controller invokes deterministic specialist tools. The functions share evidence; agreement between them is not independent corroboration.")
+    for function in profile.agent_functions:
+        st.markdown(f"**{function.name}** · {pretty(function.status)}")
+        st.write(function.summary)
+
+with st.expander(f"Event graph · {len(profile.event_graph.nodes)} signals, {len(profile.event_graph.links)} links"):
+    st.caption(profile.event_graph.limitations)
+    if profile.event_graph.nodes:
+        st.dataframe([node.model_dump(mode="json") for node in profile.event_graph.nodes], hide_index=True, width="stretch")
+    if profile.event_graph.links:
+        st.dataframe([{"From": link.signal_ids[0], "To": link.signal_ids[1], "Hours apart": link.gap_hours,
+                       "Relationship": pretty(link.relationship)} for link in profile.event_graph.links],
+                     hide_index=True, width="stretch")
+
+with st.expander(f"Case history · revision {profile.revision}"):
+    st.caption(f"Assessment runtime: {profile.metrics.assessment_duration_ms} ms. This excludes source collection and human review time.")
+    for change in profile.change_log:
+        st.write(change)
+    for revision in [*profile.previous_assessments, profile]:
+        st.markdown(f"**Revision {revision.revision}** · {revision.generated_at:%Y-%m-%d %H:%M %Z}")
+        st.caption(f"{len(revision.known_findings)} findings · {pretty(revision.leading_hypothesis.value)} · {revision.confidence.value} confidence")
+        for event in revision.action_history:
+            st.write(f"{event.recorded_at:%Y-%m-%d %H:%M %Z} · {event.actor} · {event.action_id} · {event.event}: {event.note}")
 
 evidence_col, uncertainty_col = st.columns(2, gap="large")
 with evidence_col:

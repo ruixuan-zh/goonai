@@ -2,6 +2,11 @@
 
 Audit date: 5 September 2026.
 
+Historical audit: the [10 September slide alignment review](SLIDE_ALIGNMENT.md)
+supersedes the descriptions below of context scoring, event graphs, task tracking,
+assessment history and CI coverage. The remaining scientific and pilot limitations
+still apply unless the newer review explicitly records a change.
+
 ## Assessment
 
 goonai is a coherent, small decision-support demonstration. Its useful contribution is assembling fragmented observations into a traceable investigation brief, exposing missing evidence and giving an officer a bounded next verification step. It is suitable for continued prototype development. It is not yet a validated biological-risk assessment service, and passing its tests must not be presented as evidence of clinical or attribution accuracy.

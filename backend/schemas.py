@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -43,6 +43,13 @@ class ActionStatus(StrEnum):
     REJECTED = "rejected"
 
 
+class TaskStatus(StrEnum):
+    UNASSIGNED = "unassigned"
+    ASSIGNED = "assigned"
+    ACKNOWLEDGED = "acknowledged"
+    COMPLETED = "completed"
+
+
 class SourceStatus(StrEnum):
     AVAILABLE = "available"
     PARTIAL = "partial"
@@ -68,6 +75,7 @@ class Signal(BaseModel):
     source_confidence: float = Field(ge=0, le=1)
     provenance: str
     synthetic: bool = Field(strict=True)
+    sensitivity: Literal["synthetic"] = "synthetic"
     report_summary: str | None = None
     corroborated: bool | None = None
     reported_at: AwareDatetime | None = None
@@ -117,6 +125,7 @@ class PublicObservation(BaseModel):
     source_confidence: float = Field(ge=0, le=1)
     summary: str
     limitations: str
+    sensitivity: Literal["public"] = "public"
 
 
 class SourceCoverage(BaseModel):
@@ -190,6 +199,61 @@ class ProposedAction(BaseModel):
     depends_on: list[str] = Field(default_factory=list)
     completion_criterion: str | None = None
     review_trigger: str | None = None
+    task_status: TaskStatus = TaskStatus.UNASSIGNED
+    due_at: AwareDatetime | None = None
+    assigned_at: AwareDatetime | None = None
+    acknowledged_at: AwareDatetime | None = None
+    completed_at: AwareDatetime | None = None
+    result: str | None = None
+
+
+class ActionEvent(BaseModel):
+    """Local, self-reported history; this is not an authenticated agency audit."""
+
+    action_id: str
+    event: Literal["approved", "rejected", "assigned", "acknowledged", "completed"]
+    actor: str = Field(min_length=1)
+    recorded_at: AwareDatetime
+    note: str
+
+
+class EventNode(BaseModel):
+    signal_id: str
+    timestamp: AwareDatetime
+    domain: Domain
+    location_cell: str
+    source_id: str
+    provenance: str
+    anomalous: bool
+    contextual: bool
+
+
+class EventLink(BaseModel):
+    signal_ids: tuple[str, str]
+    gap_hours: float = Field(ge=0)
+    relationship: Literal["co_occurrence", "contextual_association"]
+
+
+class EventGraph(BaseModel):
+    nodes: list[EventNode] = Field(default_factory=list)
+    links: list[EventLink] = Field(default_factory=list)
+    limitations: str = "No comparable signal-level observations were supplied; no event links are inferred."
+
+
+class ImpactAssessment(BaseModel):
+    severity: Literal["unassessed"] = "unassessed"
+    affected_domains: list[Domain] = Field(default_factory=list)
+    locations: list[str] = Field(default_factory=list)
+    evidence_ids: list[str] = Field(default_factory=list)
+    summary: str = "Clinical severity, population exposure and service disruption have not been established."
+
+
+class AgentFunction(BaseModel):
+    role_id: str
+    name: str
+    tools: list[str]
+    status: Literal["completed", "awaiting_human", "unavailable"]
+    summary: str
 
 
 class SpecialistReview(BaseModel):
@@ -210,6 +274,7 @@ class RunMetrics(BaseModel):
     estimated_cost_usd: float = Field(ge=0)
     fallback_used: bool = False
     completed_within_limits: bool = True
+    assessment_duration_ms: int = Field(default=0, ge=0)
 
 
 class Scenario(BaseModel):
@@ -251,6 +316,8 @@ class CaseState(BaseModel):
     source_coverage: list[SourceCoverage] = Field(default_factory=list)
     specialist_reviews: list[SpecialistReview] = Field(default_factory=list)
     proposed_actions: list[ProposedAction] = Field(default_factory=list)
+    event_graph: EventGraph = Field(default_factory=EventGraph)
+    primary_verification_id: str | None = None
 
 
 class RiskProfile(BaseModel):
@@ -271,3 +338,14 @@ class RiskProfile(BaseModel):
     metrics: RunMetrics
     source_coverage: list[SourceCoverage] = Field(default_factory=list)
     specialist_reviews: list[SpecialistReview] = Field(default_factory=list)
+    sensitivity: Literal["synthetic", "public"] = "synthetic"
+    event_graph: EventGraph = Field(default_factory=EventGraph)
+    impact: ImpactAssessment = Field(default_factory=ImpactAssessment)
+    agent_functions: list[AgentFunction] = Field(default_factory=list)
+    primary_verification_id: str | None = None
+    executive_brief: str = ""
+    action_history: list[ActionEvent] = Field(default_factory=list)
+    revision: int = Field(default=1, ge=1)
+    previous_assessments: list[RiskProfile] = Field(default_factory=list)
+    input_signal_ids: list[str] = Field(default_factory=list)
+    input_fingerprint: str = ""

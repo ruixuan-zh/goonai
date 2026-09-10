@@ -1,8 +1,8 @@
 {
-  "case_id": "GOONAI-ZOONOTIC_SPILLOVER-F14B29",
+  "case_id": "GOONAI-ZOONOTIC_SPILLOVER-525CD2",
   "scenario_id": "zoonotic_spillover",
   "scenario_title": "Linked avian mortality and human respiratory cluster",
-  "generated_at": "2026-09-06T10:36:30.919901Z",
+  "generated_at": "2026-09-10T04:25:27.597922Z",
   "status": "investigate",
   "confidence": "high",
   "leading_hypothesis": "natural_zoonotic",
@@ -149,7 +149,13 @@
       ],
       "depends_on": [],
       "completion_criterion": "Do paired laboratory results support a common biological cause? Record the source, event/reporting times and result, including unavailable or inconclusive outcomes.",
-      "review_trigger": "Review when a source replies or at the next reporting interval; the human owner sets the deadline."
+      "review_trigger": "Review when a source replies or at the next reporting interval; the human owner sets the deadline.",
+      "task_status": "unassigned",
+      "due_at": null,
+      "assigned_at": null,
+      "acknowledged_at": null,
+      "completed_at": null,
+      "result": null
     },
     {
       "action_id": "ACT-JOINT-REASSESSMENT",
@@ -168,7 +174,13 @@
         "ACT-PAIRED-LABORATORY-CONFIRMATION"
       ],
       "completion_criterion": "A human reviews returned or explicitly unavailable results and reruns the assessment with new evidence.",
-      "review_trigger": "After verification outcomes are recorded, or earlier if a material new signal arrives."
+      "review_trigger": "After verification outcomes are recorded, or earlier if a material new signal arrives.",
+      "task_status": "unassigned",
+      "due_at": null,
+      "assigned_at": null,
+      "acknowledged_at": null,
+      "completed_at": null,
+      "result": null
     }
   ],
   "tool_trace": [
@@ -182,7 +194,7 @@
       "summary": "Added 1 evidence record(s). Decision rationale: Check whether unusual human and animal observations align in place and time.",
       "latency_ms": 0,
       "model_id": "replay-policy-v1",
-      "responsible_role": "one_health"
+      "responsible_role": "correlation"
     },
     {
       "sequence": 2,
@@ -207,7 +219,7 @@
       "summary": "Selected paired-laboratory-confirmation: A cross-domain association is present, but it does not establish a common cause. Decision rationale: Choose the bounded verification step expected to reduce the most material uncertainty.",
       "latency_ms": 0,
       "model_id": "replay-policy-v1",
-      "responsible_role": "verification_coordination"
+      "responsible_role": "verification"
     }
   ],
   "change_log": [],
@@ -218,7 +230,8 @@
     "output_tokens": 0,
     "estimated_cost_usd": 0.0,
     "fallback_used": false,
-    "completed_within_limits": true
+    "completed_within_limits": true,
+    "assessment_duration_ms": 1
   },
   "source_coverage": [],
   "specialist_reviews": [
@@ -295,5 +308,148 @@
         "No validated transmission forecast or laboratory-supported origin assessment is available in this prototype."
       ]
     }
-  ]
+  ],
+  "sensitivity": "synthetic",
+  "event_graph": {
+    "nodes": [
+      {
+        "signal_id": "SIG-A-001",
+        "timestamp": "2026-08-14T02:00:00Z",
+        "domain": "animal",
+        "location_cell": "GRID-NE-04",
+        "source_id": "SYN-ANIMAL-SURV-01",
+        "provenance": "Synthetic scenario derived from generic animal-event surveillance fields.",
+        "anomalous": true,
+        "contextual": false
+      },
+      {
+        "signal_id": "SIG-H-001",
+        "timestamp": "2026-08-15T08:00:00Z",
+        "domain": "human",
+        "location_cell": "GRID-NE-04",
+        "source_id": "SYN-HUMAN-SURV-01",
+        "provenance": "Synthetic scenario derived from generic syndromic-surveillance fields.",
+        "anomalous": true,
+        "contextual": false
+      }
+    ],
+    "links": [
+      {
+        "signal_ids": [
+          "SIG-A-001",
+          "SIG-H-001"
+        ],
+        "gap_hours": 30.0,
+        "relationship": "co_occurrence"
+      }
+    ],
+    "limitations": "Links use the same coarse cell and a 72-hour window. They show association, not causality, transmission, source independence or origin. Context links do not affect scores."
+  },
+  "impact": {
+    "severity": "unassessed",
+    "affected_domains": [
+      "animal",
+      "human"
+    ],
+    "locations": [
+      "GRID-NE-04"
+    ],
+    "evidence_ids": [
+      "EV-ANOM-SIG-A-001",
+      "EV-ANOM-SIG-H-001"
+    ],
+    "summary": "Clinical severity, population exposure and service disruption are unassessed. Listed domains and cells describe synthetic anomalies, not confirmed harm."
+  },
+  "agent_functions": [
+    {
+      "role_id": "sentinel",
+      "name": "Sentinel",
+      "tools": [
+        "anomaly_evidence",
+        "public_bundle_to_evidence"
+      ],
+      "status": "completed",
+      "summary": "Screened the supplied snapshot against available baselines; collection is on demand."
+    },
+    {
+      "role_id": "correlation",
+      "name": "Correlation",
+      "tools": [
+        "correlate_signals",
+        "build_event_graph"
+      ],
+      "status": "completed",
+      "summary": "Built 2 event nodes and 1 cross-domain links; scored human/animal pairs only."
+    },
+    {
+      "role_id": "epidemiology",
+      "name": "Epidemiology",
+      "tools": [
+        "assess_spread_plausibility"
+      ],
+      "status": "completed",
+      "summary": "Checked animal/human temporal fit. Growth estimation and validated epidemiological modelling remain unavailable."
+    },
+    {
+      "role_id": "threat_assessment",
+      "name": "Threat Assessment",
+      "tools": [
+        "score_hypotheses",
+        "estimate_confidence"
+      ],
+      "status": "completed",
+      "summary": "Compared natural zoonotic, accidental, deliberate and insufficient-evidence support; confidence is uncalibrated."
+    },
+    {
+      "role_id": "external_intel",
+      "name": "OSINT / External Intel",
+      "tools": [
+        "verify_external_report",
+        "public_bundle_to_evidence"
+      ],
+      "status": "unavailable",
+      "summary": "No external evidence supplied; no partner, HUMINT or SIGINT integration is configured."
+    },
+    {
+      "role_id": "verification",
+      "name": "Verification",
+      "tools": [
+        "recommend_next_check"
+      ],
+      "status": "completed",
+      "summary": "Selected one primary check from approved candidates using a qualitative uncertainty heuristic."
+    },
+    {
+      "role_id": "coordination",
+      "name": "Coordination",
+      "tools": [
+        "coordinate_verification",
+        "assign_action",
+        "acknowledge_action",
+        "complete_action"
+      ],
+      "status": "awaiting_human",
+      "summary": "Prepared scoped proposals and dependencies; local assignment requires human approval and a deadline."
+    },
+    {
+      "role_id": "briefing",
+      "name": "Briefing",
+      "tools": [
+        "build_risk_profile",
+        "generate_brief"
+      ],
+      "status": "completed",
+      "summary": "Produced an evidence-linked risk profile, impact limitations and executive brief."
+    }
+  ],
+  "primary_verification_id": "ACT-PAIRED-LABORATORY-CONFIRMATION",
+  "executive_brief": "Linked avian mortality and human respiratory cluster: investigate. Leading screening explanation: natural zoonotic; high heuristic confidence. Support scores are not probabilities; origin and intent remain unconfirmed. [EV-ANOM-SIG-A-001] avian_mortality_reports in GRID-NE-04 is 7.0 standard deviations above its synthetic baseline. [EV-ANOM-SIG-H-001] influenza_like_illness_presentations in GRID-NE-04 is 5.3 standard deviations above its synthetic baseline. Impact: Clinical severity, population exposure and service disruption are unassessed. Listed domains and cells describe synthetic anomalies, not confirmed harm. Priority verification: Obtain targeted laboratory confirmation from both human and animal samples. Human approval is required before any task is assigned.",
+  "action_history": [],
+  "revision": 1,
+  "previous_assessments": [],
+  "input_signal_ids": [
+    "SIG-A-001",
+    "SIG-H-001"
+  ],
+  "input_fingerprint": "1caf916d65b544985b59d934e9c0b3bad1a7e0557af28c3e5ef71bbe3a3d96dd"
 }

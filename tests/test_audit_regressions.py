@@ -266,6 +266,11 @@ class CommandAndBaselineTests(unittest.TestCase):
         current = BioSignalOrchestrator().run(load_scenario(example.scenario_id))
         self.assertEqual(example.hypotheses, current.hypotheses)
         self.assertEqual(example.recommended_verification, current.recommended_verification)
+        self.assertEqual(example.agent_functions, current.agent_functions)
+        self.assertEqual(example.event_graph, current.event_graph)
+        self.assertEqual(example.primary_verification_id, current.primary_verification_id)
+        self.assertEqual(example.impact, current.impact)
+        self.assertEqual(example.input_fingerprint, current.input_fingerprint)
 
     def test_committed_evaluation_matches_current_replay(self):
         path = Path(__file__).resolve().parents[1] / "evals" / "replay_baseline.json"

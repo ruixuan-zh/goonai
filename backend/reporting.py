@@ -2,17 +2,23 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
+from .agent_functions import describe_agent_functions
 from .hypothesis_scoring import estimate_confidence, score_hypotheses
 from .public_sources import critical_public_source_gaps
 from .schemas import (
     ActionStatus,
+    ActionEvent,
     CaseState,
     CaseStatus,
     Confidence,
     Hypothesis,
+    ImpactAssessment,
     ProposedAction,
     RiskProfile,
     RunMetrics,
+    TaskStatus,
 )
 
 
@@ -100,7 +106,7 @@ def build_risk_profile(
     checks = list(dict.fromkeys(state.recommended_verification))
     if not checks:
         checks = ["Obtain laboratory confirmation and an independent epidemiological source."]
-    return RiskProfile(
+    profile = RiskProfile(
         case_id=state.case_id,
         scenario_id=state.scenario_id,
         scenario_title=state.scenario_title,
@@ -127,14 +133,57 @@ def build_risk_profile(
         ),
         source_coverage=state.source_coverage,
         specialist_reviews=state.specialist_reviews,
+        sensitivity="public" if state.is_public else "synthetic",
+        event_graph=state.event_graph,
+        impact=ImpactAssessment(
+            affected_domains=sorted({node.domain for node in state.event_graph.nodes if node.anomalous and not node.contextual}),
+            locations=sorted({node.location_cell for node in state.event_graph.nodes if node.anomalous and not node.contextual}),
+            evidence_ids=[f"EV-ANOM-{node.signal_id}" for node in state.event_graph.nodes if node.anomalous and not node.contextual],
+            summary=("Clinical severity, population exposure and service disruption are unassessed. "
+                     + ("Public counts have incompatible reporting intervals; no combined burden is inferred."
+                        if state.is_public else "Listed domains and cells describe synthetic anomalies, not confirmed harm.")),
+        ),
+        agent_functions=describe_agent_functions(state),
+        primary_verification_id=state.primary_verification_id,
+        input_signal_ids=[signal.signal_id for signal in state.signals],
+    )
+    profile.executive_brief = generate_brief(profile)
+    return profile
+
+
+def generate_brief(profile: RiskProfile) -> str:
+    """Build a concise brief with direct evidence references and explicit unknowns."""
+
+    primary = next((action for action in profile.proposed_actions
+                    if action.action_id == profile.primary_verification_id), None)
+    findings = " ".join(f"[{item.evidence_id}] {item.finding}" for item in profile.known_findings[:2])
+    return (
+        f"{profile.scenario_title}: {profile.status.value}. Leading screening explanation: "
+        f"{profile.leading_hypothesis.value.replace('_', ' ')}; {profile.confidence.value} heuristic confidence. "
+        f"Support scores are not probabilities; origin and intent remain unconfirmed. {findings} "
+        f"Impact: {profile.impact.summary} "
+        f"Priority verification: {primary.title if primary else profile.recommended_verification[0]} "
+        "Human approval is required before any task is assigned."
     )
 
 
-def decide_action(profile: RiskProfile, action_id: str, approved: bool) -> RiskProfile:
+def decide_action(profile: RiskProfile, action_id: str, approved: bool, *, actor: str = "Local demo reviewer") -> RiskProfile:
     """Record a human decision; the system never dispatches an action itself."""
 
     matching = [action for action in profile.proposed_actions if action.action_id == action_id]
     if not matching:
         raise ValueError(f"Unknown action: {action_id}")
-    matching[0].status = ActionStatus.APPROVED if approved else ActionStatus.REJECTED
+    if not actor.strip():
+        raise ValueError("A reviewer label is required")
+    action = matching[0]
+    status = ActionStatus.APPROVED if approved else ActionStatus.REJECTED
+    if action.status == status:
+        return profile
+    if action.status != ActionStatus.PENDING or action.task_status != TaskStatus.UNASSIGNED:
+        raise ValueError("A recorded decision cannot be overwritten; reassess the case for a new proposal")
+    action.status = status
+    profile.action_history.append(ActionEvent(
+        action_id=action_id, event=status.value, actor=actor.strip(), recorded_at=datetime.now(timezone.utc),
+        note="Human decision recorded locally; no external action dispatched.",
+    ))
     return profile

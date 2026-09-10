@@ -738,32 +738,16 @@ def public_bundle_to_evidence(bundle: PublicDataBundle) -> list[Evidence]:
             )
         )
 
-    for source_id, evidence_id, effects in (
-        (
-            "NEA-DENGUE",
-            "EV-PUBLIC-NEA-DENGUE",
-            {Hypothesis.NATURAL_ZOONOTIC: 3.0, Hypothesis.INSUFFICIENT_EVIDENCE: 0.0},
-        ),
-        (
-            "NEA-ZIKA",
-            "EV-PUBLIC-NEA-ZIKA",
-            {Hypothesis.NATURAL_ZOONOTIC: 2.0, Hypothesis.INSUFFICIENT_EVIDENCE: 0.0},
-        ),
-        (
-            "DATA-GOV-WEATHER",
-            "EV-PUBLIC-ENVIRONMENT",
-            {Hypothesis.NATURAL_ZOONOTIC: 1.0, Hypothesis.INSUFFICIENT_EVIDENCE: 1.0},
-        ),
-        (
-            "CHANGI-TRAFFIC",
-            "EV-PUBLIC-MOBILITY",
-            {Hypothesis.NATURAL_ZOONOTIC: 1.0, Hypothesis.INSUFFICIENT_EVIDENCE: 1.0},
-        ),
+    # Context without a baseline or a demonstrated case link cannot distinguish origin.
+    for source_id, evidence_id in (
+        ("NEA-DENGUE", "EV-PUBLIC-NEA-DENGUE"),
+        ("NEA-ZIKA", "EV-PUBLIC-NEA-ZIKA"),
+        ("DATA-GOV-WEATHER", "EV-PUBLIC-ENVIRONMENT"),
+        ("CHANGI-TRAFFIC", "EV-PUBLIC-MOBILITY"),
     ):
         items = by_source.get(source_id, [])
         if items:
             full_effects = {hypothesis: 0.0 for hypothesis in Hypothesis}
-            full_effects.update(effects)
             evidence.append(
                 Evidence(
                     evidence_id=evidence_id,
@@ -787,12 +771,7 @@ def public_bundle_to_evidence(bundle: PublicDataBundle) -> list[Evidence]:
                 ).strip(),
                 source_ids=["SFA-ALERTS"],
                 quality=0.96,
-                hypothesis_effects={
-                    Hypothesis.NATURAL_ZOONOTIC: min(4.0, float(len(recent_sfa))),
-                    Hypothesis.ACCIDENTAL_RELEASE: 1.0 if recent_sfa else 0.0,
-                    Hypothesis.DELIBERATE_RELEASE: 0.0,
-                    Hypothesis.INSUFFICIENT_EVIDENCE: 1.0,
-                },
+                hypothesis_effects={hypothesis: 0.0 for hypothesis in Hypothesis},
                 limitations="Food recalls are heterogeneous and do not imply a linked human outbreak.",
             )
         )
@@ -812,12 +791,7 @@ def public_bundle_to_evidence(bundle: PublicDataBundle) -> list[Evidence]:
                 ),
                 source_ids=["WHO-DON"],
                 quality=0.96,
-                hypothesis_effects={
-                    Hypothesis.NATURAL_ZOONOTIC: min(4.0, float(len(recent_who))),
-                    Hypothesis.ACCIDENTAL_RELEASE: 0.0,
-                    Hypothesis.DELIBERATE_RELEASE: 0.0,
-                    Hypothesis.INSUFFICIENT_EVIDENCE: 1.0,
-                },
+                hypothesis_effects={hypothesis: 0.0 for hypothesis in Hypothesis},
                 limitations="Regional relevance is keyword-screened; importation and linkage require Singapore evidence.",
             )
         )

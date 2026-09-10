@@ -6,11 +6,13 @@ import json
 import math
 import os
 import time
+import hashlib
 from dataclasses import dataclass
 from typing import Any, Protocol
 from uuid import uuid4
 
-from .analytics import ANALYTICAL_TOOLS, anomaly_evidence, detect_anomalies
+from .agent_functions import AGENT_FUNCTIONS
+from .analytics import ANALYTICAL_TOOLS, anomaly_evidence, build_event_graph, detect_anomalies
 from .hypothesis_scoring import score_hypotheses
 from .public_sources import critical_public_source_gaps, public_bundle_to_evidence
 from .reporting import build_risk_profile, estimate_sonnet_cost
@@ -277,6 +279,9 @@ class BioSignalOrchestrator:
         )
 
     def run(self, scenario: Scenario, *, include_new_evidence: bool = False) -> RiskProfile:
+        started = time.perf_counter()
+        # Revalidate at the execution boundary, including callers that mutated a model.
+        scenario = Scenario.model_validate(scenario.model_dump())
         signals = list(scenario.initial_signals)
         if include_new_evidence:
             signals.extend(scenario.new_evidence_signals)
@@ -297,15 +302,56 @@ class BioSignalOrchestrator:
                 f"Added {len(scenario.new_evidence_signals)} synthetic evidence signal(s) and re-ran the assessment."
             )
         self._investigate(state)
-        return build_risk_profile(
+        profile = build_risk_profile(
             state,
             max_model_calls=self.max_model_calls,
             max_tool_calls=self.max_tool_calls,
         )
+        profile.input_fingerprint = self._signal_fingerprint(signals)
+        profile.metrics.assessment_duration_ms = max(0, round((time.perf_counter() - started) * 1000))
+        return profile
+
+    @staticmethod
+    def _signal_fingerprint(signals) -> str:
+        payload = [signal.model_dump(mode="json") for signal in sorted(signals, key=lambda signal: signal.signal_id)]
+        return hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
+
+    def reassess(self, scenario: Scenario, previous: RiskProfile) -> RiskProfile:
+        """Append the scenario's new evidence and retain the previous reviewed case revision."""
+
+        scenario = Scenario.model_validate(scenario.model_dump())
+        if previous.scenario_id != scenario.scenario_id or previous.sensitivity != "synthetic":
+            raise ValueError("New evidence must belong to the same synthetic case")
+        if not scenario.new_evidence_signals:
+            raise ValueError("No new evidence is available")
+        if (set(previous.input_signal_ids) != {signal.signal_id for signal in scenario.initial_signals}
+                or previous.input_fingerprint != self._signal_fingerprint(scenario.initial_signals)):
+            raise ValueError("The initial evidence has changed or this evidence packet was already incorporated")
+        updated = self.run(scenario, include_new_evidence=True)
+        updated.case_id = previous.case_id
+        updated.revision = previous.revision + 1
+        archived = previous.model_copy(deep=True)
+        archived.previous_assessments = []
+        updated.previous_assessments = [*(item.model_copy(deep=True) for item in previous.previous_assessments), archived]
+        previous_scores = {item.hypothesis: item.support_score for item in previous.hypotheses}
+        shifts = [f"{item.hypothesis.value} {item.support_score - previous_scores[item.hypothesis]:+d}"
+                  for item in updated.hypotheses if item.support_score != previous_scores[item.hypothesis]]
+        updated.change_log = [*previous.change_log, *updated.change_log,
+            f"Revision {updated.revision}: added " + ", ".join(signal.signal_id for signal in scenario.new_evidence_signals)
+            + "; recalculated using the same deterministic tools and weights. Previous decisions and results "
+              "are retained in the prior revision; new proposals require review.",
+            f"Evidence ledger: {len(previous.known_findings)} → {len(updated.known_findings)} findings; "
+            f"leading hypothesis: {previous.leading_hypothesis.value} → {updated.leading_hypothesis.value}; "
+            f"confidence: {previous.confidence.value} → {updated.confidence.value}; "
+            f"support shifts: {', '.join(shifts) or 'no support-score movement'}.",
+        ]
+        return updated
 
     def run_public(self, bundle: PublicDataBundle) -> RiskProfile:
         """Assess the current Singapore public-data snapshot without inventing missing feeds."""
 
+        started = time.perf_counter()
+        bundle = PublicDataBundle.model_validate(bundle.model_dump())
         if bundle.geography_scope != "Singapore":
             raise ValueError("The public-data assessment is restricted to Singapore")
         state = CaseState(
@@ -329,11 +375,13 @@ class BioSignalOrchestrator:
             ],
         )
         self._investigate(state)
-        return build_risk_profile(
+        profile = build_risk_profile(
             state,
             max_model_calls=self.max_model_calls,
             max_tool_calls=self.max_tool_calls,
         )
+        profile.metrics.assessment_duration_ms = max(0, round((time.perf_counter() - started) * 1000))
+        return profile
 
     def _available_tools(self, state: CaseState) -> list[str]:
         available: list[str] = []
@@ -437,6 +485,9 @@ class BioSignalOrchestrator:
         scores = score_hypotheses(state.evidence)
         return {
             "case_id": state.case_id,
+            "sensitivity": "public" if state.is_public else "synthetic",
+            "agent_functions": {role: {"name": name, "tools": tools}
+                                for role, (name, tools) in AGENT_FUNCTIONS.items()},
             "evidence": [
                 {
                     "evidence_id": item.evidence_id,
@@ -571,6 +622,8 @@ class BioSignalOrchestrator:
     def _execute_tool(self, name: str, state: CaseState, tool_input: dict[str, Any]) -> str:
         if name in ANALYTICAL_TOOLS:
             new_evidence = ANALYTICAL_TOOLS[name](state.signals)
+            if name == "correlate_signals":
+                state.event_graph = build_event_graph(state.signals)
             known_ids = {item.evidence_id for item in state.evidence}
             state.evidence.extend(item for item in new_evidence if item.evidence_id not in known_ids)
             return f"Added {len(new_evidence)} evidence record(s)."
@@ -583,6 +636,7 @@ class BioSignalOrchestrator:
             if candidate_id not in candidates:
                 raise OrchestrationError("The controller selected an unavailable verification candidate")
             selected = candidates[candidate_id]
+            state.primary_verification_id = f"ACT-{candidate_id.upper()}"
             state.proposed_actions = coordinate_verification(state, list(candidates.values()), candidate_id)
             state.recommended_verification.extend(action.title for action in state.proposed_actions if not action.depends_on)
             state.open_questions.append(selected["question"])

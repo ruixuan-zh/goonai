@@ -73,12 +73,17 @@ def main() -> int:
             print(f"Wrote public snapshot: {args.snapshot_output.resolve()}")
     else:
         scenario = load_scenario(args.scenario)
-        profile = orchestrator.run(scenario, include_new_evidence=args.include_new_evidence)
+        profile = orchestrator.run(scenario)
+        if args.include_new_evidence and scenario.new_evidence_signals:
+            profile = orchestrator.reassess(scenario, profile)
 
     print(f"Case: {profile.case_id}")
     print(f"Status: {profile.status.value}")
     print(f"Leading hypothesis: {profile.leading_hypothesis.value}")
     print(f"Confidence: {profile.confidence.value}")
+    print(f"Revision: {profile.revision}")
+    print(f"Impact: {profile.impact.summary}")
+    print(f"Executive brief: {profile.executive_brief}")
     print(f"Evidence records: {len(profile.known_findings)}")
     print(
         "Run limits: "

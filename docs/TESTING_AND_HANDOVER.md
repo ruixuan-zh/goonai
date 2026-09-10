@@ -64,7 +64,7 @@ Run these commands from the repository root.
 ### 1. Offline automated tests
 
 ```powershell
-python -m unittest discover -s tests -v
+python -m pytest -q
 python -m backend.evaluate
 ```
 
@@ -116,6 +116,15 @@ Confirm that the page shows hypothesis support, evidence provenance, the tool
 trace, uncertainty, a proposed action and the human approval gate. Then use
 **Inject new synthetic evidence** on a scenario that provides an evidence
 packet and confirm the change log updates.
+
+Open **Specialist functions**, **Event graph**, **Executive brief and impact** and
+**Case history** to review the slide-aligned outputs. Approve the primary task,
+choose a deadline, use **Assign locally**, **Record acknowledgement** and **Record
+completion**, then inject new evidence. Confirm the completed task and its result
+remain in revision 1 while revision 2 proposals require new approval. The joint
+review cannot be assigned until its prerequisite tasks have completed. These are
+self-reported local records; no agency receives a notification. Export the JSON to
+retain the case beyond the Streamlit session.
 
 ### 4. Singapore public-data integration
 
@@ -248,6 +257,8 @@ Python.
 | `backend/hypothesis_scoring.py` | Transparent support scores and confidence |
 | `backend/orchestrator.py` | Replay/Bedrock decisions, tool allow-list and loop limits |
 | `backend/reporting.py` | Risk profiles, cost estimate and human decisions |
+| `backend/agent_functions.py` | Eight slide functions with actual coverage and limitations |
+| `backend/coordination.py` | Local task assignment, acknowledgement and result history |
 | `backend/evaluate.py` | Reproducible curated-scenario evaluation |
 | `backend/run_demo.py` | Command-line entry point |
 | `frontend/app.py` | Streamlit operator interface |
@@ -358,7 +369,7 @@ model enablement and `bedrock:InvokeModel` permission.
 ## Before opening a pull request
 
 ```powershell
-python -m unittest discover -s tests -v
+python -m pytest -q
 python -m backend.evaluate
 git diff --check
 git status --short
@@ -386,3 +397,9 @@ licence before making reuse claims.
 Read [REPOSITORY_AUDIT.md](REPOSITORY_AUDIT.md) before planning a pilot. The
 committed example is a complete `RiskProfile`, including its tool trace; the
 separate handwritten trace example was removed to avoid duplicate, stale outputs.
+
+The newer [slide alignment review](SLIDE_ALIGNMENT.md) records the BIO-SIGNAL
+workflow changes and remaining roadmap gaps. `assessment_duration_ms` measures
+one assessment, excluding public collection and human review. It is not the slide
+8 first-signal-to-decision measure. The CLI evidence-update demo performs two
+bounded assessments; each revision retains its own token and cost counters.
