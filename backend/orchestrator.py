@@ -159,6 +159,12 @@ class BedrockDecisionClient:
                     }
                 }
             )
+        tool_choice = {"auto": {}}
+        if self.model_id.startswith("us.anthropic.") and "-4-5" in self.model_id:
+            # Claude 4.5 may answer with prose under auto selection even though
+            # every controller turn requires exactly one approved tool.
+            tool_choice = {"any": {}}
+
         response = self._client.converse(
             modelId=self.model_id,
             system=[
@@ -181,7 +187,7 @@ class BedrockDecisionClient:
                 }
             ],
             inferenceConfig={"maxTokens": self.max_output_tokens},
-            toolConfig={"tools": tools, "toolChoice": {"auto": {}}},
+            toolConfig={"tools": tools, "toolChoice": tool_choice},
         )
         content = response.get("output", {}).get("message", {}).get("content", [])
         usage = response.get("usage", {})
@@ -194,6 +200,9 @@ class BedrockDecisionClient:
         tool_input = tool_use.get("input", {})
         if not isinstance(tool_input, dict):
             raise InvalidDecisionError("Bedrock returned invalid tool input", input_tokens, output_tokens)
+        rationale = tool_input.get("rationale")
+        if isinstance(rationale, str) and len(rationale) > 240:
+            tool_input = {**tool_input, "rationale": rationale[:240].rstrip()}
         if (
             tool_use["name"] == "recommend_next_check"
             and tool_input.get("candidate_id") not in candidate_ids
@@ -556,11 +565,18 @@ class BioSignalOrchestrator:
                     candidate["candidate_id"] for candidate in packet["verification_candidates"]
                 }:
                     raise OrchestrationError("The controller selected an unavailable verification candidate")
-            if (
-                not isinstance(rationale, str) or not rationale.strip() or len(rationale) > 240
-                or set(decision.tool_input) - allowed_keys
-            ):
-                raise OrchestrationError("The controller returned invalid decision arguments")
+            invalid_arguments: list[str] = []
+            if not isinstance(rationale, str) or not rationale.strip():
+                invalid_arguments.append("missing rationale")
+            elif len(rationale) > 240:
+                invalid_arguments.append("rationale exceeds 240 characters")
+            if set(decision.tool_input) - allowed_keys:
+                invalid_arguments.append("unexpected argument fields")
+            if invalid_arguments:
+                raise OrchestrationError(
+                    "The controller returned invalid decision arguments: "
+                    + ", ".join(invalid_arguments)
+                )
             return result
         except BudgetExceededError:
             raise

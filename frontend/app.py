@@ -375,7 +375,11 @@ with st.expander(setup_label, expanded=setup_expanded):
             disabled=source_mode == "Singapore public data",
         )
     with control_middle:
-        mode = st.selectbox("Decision mode", ["replay", "live"], help="Live uses Sonnet 5 on Bedrock.")
+        mode = st.selectbox(
+            "Decision mode",
+            ["replay", "live"],
+            help="Live uses the Amazon Bedrock model configured for this environment.",
+        )
     scenario = load_scenario(selected)
     if source_mode == "Curated scenario":
         st.markdown(incoming_alert_html(scenario), unsafe_allow_html=True)

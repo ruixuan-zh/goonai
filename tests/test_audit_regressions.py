@@ -250,6 +250,29 @@ class ControllerBoundaryTests(unittest.TestCase):
         self.assertNotIn("temperature", client._client.request["inferenceConfig"])
         self.assertEqual(client._client.request["toolConfig"]["toolChoice"], {"auto": {}})
 
+    def test_claude_4_5_requires_one_of_the_available_tools(self):
+        client = object.__new__(BedrockDecisionClient)
+        client._client = FakeBedrockRuntime()
+        client.model_id = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+        client.max_output_tokens = 300
+        client.choose({}, ["correlate_signals"])
+        self.assertEqual(client._client.request["toolConfig"]["toolChoice"], {"any": {}})
+
+    def test_bedrock_rationale_is_bounded_after_generation(self):
+        runtime = Mock()
+        runtime.converse.return_value = {
+            "output": {"message": {"content": [{"toolUse": {
+                "name": "correlate_signals", "input": {"rationale": "x" * 300}
+            }}]}},
+            "usage": {"inputTokens": 90, "outputTokens": 12},
+        }
+        client = object.__new__(BedrockDecisionClient)
+        client._client = runtime
+        client.model_id = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+        client.max_output_tokens = 300
+        result = client.choose({}, ["correlate_signals"])
+        self.assertEqual(len(result.decision.tool_input["rationale"]), 240)
+
     def test_packet_contains_provenance(self):
         scenario = load_scenario("zoonotic_spillover")
         profile = BioSignalOrchestrator().run(scenario)
